@@ -2,6 +2,206 @@
 const SHEET_ID = '1YDuNRBGTx5Jw3kZBYehlYUW4eIFPClDIC91TR_720js';
 // ────────────────────────────────────────────
 
+// ── Custom Menu ───────────────────────────────
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('⚽ WC2026')
+    .addItem('Update Score…', 'showUpdateScoreDialog')
+    .addItem('Clear Manual Override…', 'showClearOverrideDialog')
+    .addSeparator()
+    .addItem('Recalc Group Standings', 'recalcGroups')
+    .addItem('Setup Sheet Validation', 'setupSheetValidation')
+    .addToUi();
+}
+
+function showUpdateScoreDialog() {
+  const ui = SpreadsheetApp.getUi();
+  const idResp = ui.prompt('Update Score', 'Match ID (number):', ui.ButtonSet.OK_CANCEL);
+  if (idResp.getSelectedButton() !== ui.Button.OK) return;
+  const matchId = Number(idResp.getResponseText().trim());
+  if (!matchId) { ui.alert('Invalid match ID.'); return; }
+
+  const scoreResp = ui.prompt('Update Score', 'Score for match ' + matchId + '\nFormat: home-away  (e.g. 2-1):', ui.ButtonSet.OK_CANCEL);
+  if (scoreResp.getSelectedButton() !== ui.Button.OK) return;
+  const parts = scoreResp.getResponseText().split('-');
+  if (parts.length !== 2) { ui.alert('Invalid format — use e.g. 2-1'); return; }
+  const score1 = Number(parts[0].trim());
+  const score2 = Number(parts[1].trim());
+  if (isNaN(score1) || isNaN(score2)) { ui.alert('Scores must be numbers.'); return; }
+
+  const ok = manualSetScore(matchId, score1, score2);
+  if (ok) ui.alert('Match ' + matchId + ' set to ' + score1 + '–' + score2 + ' ✓');
+  else    ui.alert('Match ID ' + matchId + ' not found.');
+}
+
+function showClearOverrideDialog() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.prompt('Clear Manual Override', 'Match ID to unlock (API sync will resume):', ui.ButtonSet.OK_CANCEL);
+  if (resp.getSelectedButton() !== ui.Button.OK) return;
+  const matchId = Number(resp.getResponseText().trim());
+  if (!matchId) { ui.alert('Invalid match ID.'); return; }
+  const ok = clearManualOverride(matchId);
+  if (ok) ui.alert('Match ' + matchId + ' unlocked — will sync from API next run.');
+  else    ui.alert('Match ID ' + matchId + ' not found.');
+}
+
+function manualSetScore(matchId, score1, score2) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+  const rows = sheet.getDataRange().getValues();
+  const i = rows.findIndex((r, idx) => idx > 0 && Number(r[0]) === matchId);
+  if (i < 0) return false;
+  sheet.getRange(i + 1, 13, 1, 3).setValues([[score1, score2, 'finished']]);
+  sheet.getRange(i + 1, 18).setValue(true);
+  recalcGroups();
+  Logger.log('manualSetScore: match ' + matchId + ' → ' + score1 + '-' + score2);
+  return true;
+}
+
+function clearManualOverride(matchId) {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+  const rows = sheet.getDataRange().getValues();
+  const i = rows.findIndex((r, idx) => idx > 0 && Number(r[0]) === matchId);
+  if (i < 0) return false;
+  sheet.getRange(i + 1, 18).setValue('');
+  Logger.log('clearManualOverride: match ' + matchId + ' unlocked');
+  return true;
+}
+
+function setupSheetValidation() {
+  setupHeaders(); // ensure headers exist before applying validation
+
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+
+  // Col O (status): dropdown
+  sheet.getRange(2, 15, lastRow - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['upcoming', 'finished'], true)
+      .setAllowInvalid(false)
+      .build()
+  );
+
+  // Col R (manual): checkbox
+  sheet.getRange(2, 18, lastRow - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireCheckbox()
+      .build()
+  );
+
+  SpreadsheetApp.getUi().alert('Sheet validation set up ✓\nCol O: dropdown  |  Col R: checkbox\nHeaders added to matches & groups tabs.');
+}
+
+function setupHeaders() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+
+  ss.getSheetByName('matches').getRange(1, 1, 1, 18).setValues([[
+    'match_id', 'date', 'time_utc8', 'phase', 'group', 'round',
+    'home_code', 'home_name', 'home_flag',
+    'away_code', 'away_name', 'away_flag',
+    'score_home', 'score_away', 'status',
+    'venue', 'city', 'manual'
+  ]]);
+
+  ss.getSheetByName('groups').getRange(1, 1, 1, 12).setValues([[
+    'group', 'team_code', 'team_name', 'team_flag',
+    'played', 'win', 'draw', 'loss',
+    'gf', 'ga', 'gd', 'pts'
+  ]]);
+}
+// ─────────────────────────────────────────────
+
+// ── Auto Score Sync (football-data.org) ──────
+// Step 1: run setApiKey() once from the Apps Script editor to store your key.
+// Step 2: run setupSyncTrigger() to auto-sync every 10 minutes.
+
+function setApiKey() {
+  const key = SpreadsheetApp.getUi().prompt('Enter football-data.org API key:').getResponseText().trim();
+  if (!key) return;
+  PropertiesService.getScriptProperties().setProperty('FD_API_KEY', key);
+  SpreadsheetApp.getUi().alert('API key saved.');
+}
+
+// Our team codes → football-data.org TLA (only list differences)
+const CODE_MAP = {
+  HAI: 'HTI',  // Haiti
+  CGO: 'COD',  // DR Congo
+  SCO: 'SCO',  // Scotland (same, listed for clarity)
+};
+function fdCode(c) { return CODE_MAP[c] || c; }
+
+// Convert UTC ISO string to YYYY-MM-DD in UTC+8
+function utcToDate8(utcStr) {
+  const d = new Date(new Date(utcStr).getTime() + 8 * 3600000);
+  return d.toISOString().slice(0, 10);
+}
+
+function syncScores() {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('FD_API_KEY');
+  if (!apiKey) { Logger.log('No API key — run setApiKey() first.'); return; }
+
+  const resp = UrlFetchApp.fetch(
+    'https://api.football-data.org/v4/competitions/WC/matches',
+    { headers: { 'X-Auth-Token': apiKey }, muteHttpExceptions: true }
+  );
+
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('API error ' + resp.getResponseCode() + ': ' + resp.getContentText());
+    return;
+  }
+
+  const apiMatches = JSON.parse(resp.getContentText()).matches;
+
+  // Lookup by "T1_T2" — each pair plays at most once in WC group stage
+  const byTeams = {};
+  // Also by "YYYY-MM-DD_T1_T2" (UTC+8) for robustness
+  const byDateTeams = {};
+  apiMatches.forEach(m => {
+    const t1 = m.homeTeam.tla;
+    const t2 = m.awayTeam.tla;
+    const d8 = utcToDate8(m.utcDate);
+    byTeams[`${t1}_${t2}`] = m;
+    byDateTeams[`${d8}_${t1}_${t2}`] = m;
+  });
+
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName('matches');
+  const rows = sheet.getDataRange().getValues();
+
+  let updated = 0;
+  rows.slice(1).forEach((row, i) => {
+    if (!row[0] || !row[6]) return; // skip empty or knockout TBD rows
+    if (row[17] === true) return;   // col R manual lock — don't overwrite
+    const t1 = fdCode(String(row[6]));
+    const t2 = fdCode(String(row[9]));
+    const date = formatDate(row[1]);
+    const m = byDateTeams[`${date}_${t1}_${t2}`] || byTeams[`${t1}_${t2}`];
+    if (!m) return;
+
+    const s = m.score.fullTime;
+    if (s.home === null && s.away === null) return;
+
+    const status = m.status === 'FINISHED' ? 'finished' : 'upcoming';
+
+    sheet.getRange(i + 2, 13, 1, 3).setValues([[s.home, s.away, status]]);
+    updated++;
+  });
+
+  Logger.log(`syncScores: ${updated} matches updated`);
+  if (updated > 0) recalcGroups();
+}
+
+function setupSyncTrigger() {
+  // Remove existing syncScores triggers, then create a fresh 10-min trigger
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'syncScores')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+
+  ScriptApp.newTrigger('syncScores').timeBased().everyMinutes(10).create();
+  SpreadsheetApp.getUi().alert('Done — syncScores will run every 10 minutes.');
+}
+// ─────────────────────────────────────────────
+
 function doGet(e) {
   const action = (e.parameter.action || '').trim();
   let result;
