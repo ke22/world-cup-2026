@@ -101,7 +101,7 @@ body {
 
   /* nav vertical within 76px */
   .center-nav { display: flex !important; flex-direction: column; gap: 4px; width: 100%; margin-top: 4px; }
-  .cnav-btn { width: 100%; text-align: center; padding: 4px 2px; font-size: 10px; }
+  .cnav-btn { width: 100%; text-align: center; padding: 10px 8px; font-size: 10px; }
 
   .bracket-tree { min-width: 100%; align-items: stretch; justify-content: center; }
   .round-col.collapsed { display: none; }
@@ -565,6 +565,10 @@ body {
   border-top: 1px solid var(--border);
   line-height: 1.7;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -581,7 +585,7 @@ body {
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxB_BEJ2ldNqFfBnKrnC6aP51--jfkU4lvXuTjdByAF10FMiE92ys7IxlsiNwtV7fJDtQ/exec';
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
 const CACHE_TTL = 300;
 
 /* ── Group static data ─────────────────────────── */
@@ -943,6 +947,15 @@ function mobileCenterScroll() {
   outer.scrollLeft = Math.max(0, (inner.offsetWidth - outer.clientWidth) / 2);
 }
 
+function notifyHeight() {
+  try {
+    window.parent.postMessage(
+      { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
+      '*'
+    );
+  } catch {}
+}
+
 function fitBracket() {
   const inner = document.querySelector('.bracket-inner');
   const outer = document.querySelector('.bracket-outer');
@@ -960,10 +973,10 @@ function fitBracket() {
   const availW   = outer.clientWidth;
   const availH   = outer.clientHeight;
 
-  if (!naturalW || !naturalH || !availW || !availH) return;
+  if (!naturalW || !naturalH || !availW) return;
 
   const scaleW = availW / naturalW;
-  const scaleH = availH / naturalH;
+  const scaleH = availH ? availH / naturalH : 1;
   const scale  = Math.min(scaleW, scaleH);
 
   if (scale >= 1) {
@@ -980,9 +993,14 @@ function fitBracket() {
       outer.scrollLeft = Math.max(0, (naturalW - availW) / 2);
     });
   }
+  notifyHeight();
 }
 
-window.addEventListener('resize', fitBracket);
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(fitBracket, 150);
+});
 
 
 const ROUND_PHASE_MAP = {
@@ -1123,6 +1141,7 @@ async function init() {
   if (!GAS_URL) {
     document.getElementById('bracket-desktop').innerHTML =
       '<div class="bracket-panel"><div class="state-msg state-error">資料來源未設定</div></div>';
+    notifyHeight();
     return;
   }
   let all;
@@ -1130,6 +1149,7 @@ async function init() {
   catch {
     document.getElementById('bracket-desktop').innerHTML =
       '<div class="bracket-panel"><div class="state-msg state-error">資料載入失敗，請稍後重試</div></div>';
+    notifyHeight();
     return;
   }
 

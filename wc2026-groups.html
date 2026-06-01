@@ -23,6 +23,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { min-height: -webkit-fill-available; }
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
@@ -31,6 +32,7 @@ body {
   color: var(--fg);
   font-size: 14px;
   line-height: 1.5;
+  min-height: -webkit-fill-available;
 }
 
 /* ── Page wrapper ── */
@@ -38,10 +40,9 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 14px 14px 0;
-  height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* ── Header ── */
@@ -73,7 +74,7 @@ body {
   box-shadow: 0 2px 8px var(--shadow);
 }
 .anchor-btn {
-  height: 32px; padding: 0 12px;
+  height: 44px; padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -161,6 +162,16 @@ body {
 
 /* ── CNA Logo ── */
 .cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+
+@media (max-width: 767px) {
+  .anchor-nav { padding: 5px 12px; gap: 4px; }
+  .anchor-btn { height: 32px; font-size: 12px; padding: 0 8px; }
+  .group-section { scroll-margin-top: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -181,7 +192,7 @@ body {
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxB_BEJ2ldNqFfBnKrnC6aP51--jfkU4lvXuTjdByAF10FMiE92ys7IxlsiNwtV7fJDtQ/exec';
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
 const CACHE_TTL = 300;
 
 function cacheGet(key) {
@@ -297,18 +308,30 @@ function renderGroups(groups) {
   }).join('');
 }
 
+function notifyHeight() {
+  try {
+    window.parent.postMessage(
+      { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
+      '*'
+    );
+  } catch {}
+}
+
 async function init() {
   if (!GAS_URL) {
     document.getElementById('groups-container').innerHTML =
       '<div class="state-msg state-error">資料來源未設定</div>';
+    notifyHeight();
     return;
   }
   try {
     const groups = await fetchGroups();
     renderGroups(groups);
+    notifyHeight();
   } catch (err) {
     document.getElementById('groups-container').innerHTML =
       `<div class="state-msg state-error">積分榜載入失敗，請稍後重試</div>`;
+    notifyHeight();
   }
 }
 

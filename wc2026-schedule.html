@@ -25,6 +25,7 @@
 
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { min-height: -webkit-fill-available; }
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
@@ -33,6 +34,7 @@ body {
   color: var(--fg);
   font-size: 14px;
   line-height: 1.5;
+  min-height: -webkit-fill-available;
 }
 button { font-family: inherit; cursor: pointer; border: none; }
 
@@ -44,10 +46,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
   max-width: 900px;
   margin: 0 auto;
   padding: 14px 14px 0;
-  height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* ── Main panel ── */
@@ -112,7 +113,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .date-tabs { display: flex; flex: 1; justify-content: space-around; overflow: hidden; }
 .date-tab {
   display: flex; flex-direction: column; align-items: center;
-  padding: 5px 2px; border-radius: 10px; border: none; background: none;
+  padding: 8px 4px; border-radius: 10px; border: none; background: none;
   flex: 1; min-width: 0; color: var(--muted);
   transition: background 0.12s, color 0.12s;
 }
@@ -268,6 +269,10 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .group-table .t-flag { font-size: 14px; }
 .group-table .t-name { font-size: 11px; font-weight: 600; color: var(--fg); }
 .group-table .pts-cell { font-weight: 800; color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -290,7 +295,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 <script>
 // ── 部署時修改這裡 ───────────────────────────
-const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxB_BEJ2ldNqFfBnKrnC6aP51--jfkU4lvXuTjdByAF10FMiE92ys7IxlsiNwtV7fJDtQ/exec';   // GAS Web App 部署 URL
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';   // GAS Web App 部署 URL
 const CACHE_TTL    = 300;  // 快取秒數
 const LIVE_REFRESH = 60;   // live 場次自動刷新秒數
 // ────────────────────────────────────────────
@@ -538,6 +543,7 @@ function renderMatches() {
 
   if (!matches.length) {
     list.innerHTML = '<div class="state-msg">本日無賽事</div>';
+    notifyHeight();
     return;
   }
 
@@ -548,6 +554,7 @@ function renderMatches() {
     </div>
     ${matches.map(renderMatchCard).join('')}
   `;
+  notifyHeight();
 }
 
 function renderMatchCard(m) {
@@ -687,7 +694,7 @@ function selectDate(ymd) {
 function notifyHeight() {
   try {
     window.parent.postMessage(
-      { type: 'wc2026-resize', height: document.body.scrollHeight },
+      { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
       '*'
     );
   } catch {}
