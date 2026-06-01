@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIFA 世界杯 2026 賽程樹</title>
+<style>
+/* ── CNA Design System ── */
+:root {
+  color-scheme: light;
+  --bg:          #eef2f6;
+  --surface:     #ffffff;
+  --surface-2:   #f5f8fc;
+  --fg:          #1f2937;
+  --muted:       #66758a;
+  --border:      rgba(15, 50, 96, 0.12);
+  --border-line: rgba(15, 50, 96, 0.22);
+  --shadow:      rgba(15, 75, 143, 0.08);
+  --accent:      #0f4b8f;
+  --accent-2:    #2c73c9;
+  --accent-soft: rgba(15, 75, 143, 0.08);
+  --header-from: #13579f;
+  --header-to:   #0f4b8f;
+  --live-color:  #d63200;
+  --gold:        #b8860b;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { min-height: -webkit-fill-available; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: -webkit-fill-available;
+}
+
+/* ── CNA Logo ── */
+.cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+
+/* ── Page ── */
+.page {
+  padding: 14px 14px 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.page-header {
+  background: linear-gradient(180deg, var(--header-from) 0%, var(--header-to) 100%);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.page-header-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 0.2px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── State ── */
+.state-msg { text-align: center; padding: 40px 20px; font-size: 15px; color: var(--muted); }
+.state-error { color: #c0392b; }
+
+.bracket-desktop { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.bracket-mobile  { display: none; }
+
+/* ── Mobile: center nav fills remaining space (≤659px) ── */
+@media (max-width: 659px) {
+  /* Allow scroll to propagate — override ancestor overflow:hidden */
+  .page            { overflow: visible; }
+  .bracket-desktop { overflow: visible; }
+  .bracket-panel   { overflow: visible; }
+  .bracket-outer-wrap { justify-content: center; overflow: visible; }
+  .bracket-outer { overflow: visible; width: 100%; }
+  /* scroll mode: switch to block so overflow-x scroll works on layout content */
+  .bracket-outer.fit-scroll {
+    display: block;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bracket-inner { width: max-content; }
+  .groups-col { display: none; }
+
+  /* center keeps its natural width (76px from inline style) */
+  .bracket-center {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px;
+    border: none;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    overflow: visible;
+  }
+  .center-content { align-items: center; gap: 6px; }
+  .trophy-icon { font-size: 28px; }
+  .center-tbd { display: none; }
+
+  /* nav vertical within 76px */
+  .center-nav { display: flex !important; flex-direction: column; gap: 4px; width: 100%; margin-top: 4px; }
+  .cnav-btn { width: 100%; text-align: center; padding: 4px 2px; font-size: 10px; }
+
+  .bracket-tree { min-width: 100%; align-items: stretch; justify-content: center; }
+  .round-col.collapsed { display: none; }
+}
+
+/* Outer centering wrapper — fills remaining height */
+.bracket-outer-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Outer wrapper */
+.bracket-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 10px 30px var(--shadow);
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.bracket-outer {
+  flex: 1;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bracket-inner {
+  width: max-content;
+  transform-origin: center center;
+}
+
+/* ── Col grip (thin edge strip to trigger collapse) ── */
+.col-grip {
+  flex-shrink: 0;
+  width: 8px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  color: transparent;
+  font-size: 7px;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.col-grip:hover { background: var(--accent-soft); color: var(--accent); }
+.round-col.collapsed .col-grip { display: none; }
+/* Right bracket: grip on left side (mirror) */
+.bracket-right .round-col .col-content-wrap { flex-direction: row-reverse; }
+.bracket-right .col-grip { transform: scaleX(-1); }
+.col-content-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* ── Bracket tree ── */
+.bracket-tree {
+  display: flex;
+  align-items: stretch;
+}
+
+/* ── Group boxes column ── */
+.groups-col {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2px;
+  gap: 2px;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.groups-col.right-col { border-right: none; border-left: 1px solid var(--border); }
+
+.group-box {
+  flex: 1;
+  border: 2px solid var(--gc, #aaa);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.group-name {
+  background: var(--gc, #aaa);
+  color: #fff;
+  font-size: 11px; font-weight: 900;
+  text-align: center;
+  padding: 2px 0;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+.gb-teams {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 2px 3px;
+}
+.gb-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+}
+.gb-flag { font-size: 11px; flex-shrink: 0; line-height: 1; }
+.gb-name { font-size: 8px; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Round column ── */
+.round-col {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  transition: width 0.25s ease, flex 0.25s ease;
+  position: relative;
+}
+.round-col:last-child { border-right: none; }
+
+/* ── Collapsed column ── */
+.round-col.collapsed {
+  width: 26px !important;
+  flex: 0 0 26px !important;
+  cursor: pointer;
+  background: var(--surface-2);
+  overflow: hidden;
+  justify-content: center;
+  align-items: center;
+  padding-top: 0;
+  transition: width 0.2s ease;
+}
+.round-col.collapsed .col-content-wrap { display: none; }
+.round-col .col-dots {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+.round-col.collapsed .col-dots { display: flex; flex: 1; align-items: center; justify-content: center; }
+.col-dots-ellipsis {
+  font-size: 10px; font-weight: 700; color: var(--accent);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 1px;
+}
+.col-dots-ellipsis .tcy {
+  text-combine-upright: all;
+}
+
+/* ── Match pair ── */
+.match-pair {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex: 1;
+  transition: flex 0.2s ease;
+}
+
+
+.col-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Vertical connector (right side — left bracket) */
+.bracket-left .match-pair::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 25%; height: 50%;
+  width: 2px;
+  background: var(--border-line);
+}
+
+/* Vertical connector (left side — right bracket) */
+.bracket-right .match-pair::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 25%; height: 50%;
+  width: 2px;
+  background: var(--border-line);
+}
+
+/* Match slot */
+.match-slot {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding: 3px 8px 3px 4px;
+  position: relative;
+  min-height: 28px;
+}
+
+/* Horizontal stub — left bracket → right */
+.bracket-left .match-slot::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 50%;
+  width: 8px; height: 2px;
+  background: var(--border-line);
+  transform: translateY(-1px);
+}
+
+/* Horizontal stub — right bracket → left */
+.bracket-right .match-slot {
+  padding: 3px 4px 3px 8px;
+}
+.bracket-right .match-slot::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  width: 8px; height: 2px;
+  background: var(--border-line);
+  transform: translateY(-1px);
+}
+
+/* Single slot (SF) */
+.match-slot-single {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 3px 8px 3px 4px;
+  position: relative;
+}
+.bracket-left .match-slot-single::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 50%;
+  width: 8px; height: 2px;
+  background: var(--border-line);
+  transform: translateY(-1px);
+}
+.bracket-right .match-slot-single {
+  padding: 3px 4px 3px 8px;
+}
+.bracket-right .match-slot-single::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  width: 8px; height: 2px;
+  background: var(--border-line);
+  transform: translateY(-1px);
+}
+
+/* ── Match node card ── */
+.match-node {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.match-node.live     { border-color: rgba(214,50,0,0.3); background: #fff8f5; }
+.match-node.finished { opacity: 0.88; }
+
+/* Team row */
+.mn-row {
+  display: flex;
+  align-items: center;
+  padding: 5px 7px;
+  gap: 5px;
+  border-bottom: 1px solid rgba(15,50,96,0.05);
+}
+.mn-row:last-of-type { border-bottom: none; }
+
+.mn-flag  { font-size: 14px; flex-shrink: 0; line-height: 1; }
+.mn-name  { flex: 1; font-size: 14px; font-weight: 700; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mn-name.seed { font-size: 11px; font-weight: 600; color: var(--accent-2); font-style: normal; }
+.mn-name.tbd  { font-size: 11px; color: var(--muted); font-weight: 400; font-style: italic; }
+.mn-score { font-size: 14px; font-weight: 800; color: var(--fg); min-width: 14px; text-align: right; flex-shrink: 0; }
+.mn-score.winner { color: var(--accent); }
+.mn-score.live   { color: var(--live-color); }
+
+/* ── Center column (trophy + Final) ── */
+.bracket-center {
+  flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 30px 6px 8px;
+  overflow: visible;
+}
+.center-content {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 28px 8px 12px; /* top padding leaves room for trophy overhang */
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 2px 8px var(--shadow);
+  width: 100%;
+}
+.trophy-icon {
+  position: absolute;
+  top: -22px; left: 50%; transform: translateX(-50%);
+  font-size: 40px; line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(184,134,11,0.35));
+}
+.center-tbd {
+  font-size: 11px; color: var(--muted); font-style: italic; font-weight: 400;
+  text-align: center;
+}
+.champion-flag { font-size: 26px; line-height: 1; }
+.champion-name { font-size: 11px; font-weight: 800; color: var(--accent); text-align: center; }
+
+/* ── Center nav (mobile only — hidden on desktop) ── */
+.center-nav { display: none; }
+.cnav-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 6px;
+  font-size: 10px; font-weight: 700; color: var(--accent);
+  cursor: pointer; font-family: inherit;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.cnav-btn:hover { background: var(--accent-soft); }
+.cnav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.center-slot {
+  width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 7px;
+  display: flex; align-items: center; gap: 5px;
+}
+.center-slot .mn-flag { font-size: 14px; flex-shrink: 0; }
+.center-slot .mn-name { flex: 1; font-size: 13px; font-weight: 700; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.center-slot .mn-name.tbd { color: var(--muted); font-weight: 400; font-style: italic; font-size: 11px; }
+.center-slot .mn-score { font-size: 13px; font-weight: 800; color: var(--fg); }
+.center-slot .mn-score.winner { color: var(--accent); }
+.center-slot .mn-score.live   { color: var(--live-color); }
+
+/* ── Seed legend note ── */
+.seed-legend {
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  line-height: 1.7;
+}
+
+
+/* ════════════════════════════════════════════════
+   MOBILE (< 660px)
+   ════════════════════════════════════════════════ */
+.mobile-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 10px 30px var(--shadow);
+  overflow: hidden;
+}
+
+/* Accordion section */
+.round-section { border-top: 1px solid var(--border); }
+.round-section:first-child { border-top: none; }
+
+.round-toggle-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px;
+  background: var(--surface-2);
+  border: none; cursor: pointer; font-family: inherit; text-align: left;
+  transition: background 0.12s;
+}
+.round-toggle-btn:hover { background: var(--accent-soft); }
+
+.rtl { display: flex; align-items: center; gap: 10px; }
+.rtl-label { font-size: 16px; font-weight: 800; color: var(--accent); }
+
+.round-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+}
+.rb-active   { background: rgba(44,115,201,0.12); color: var(--accent-2); }
+.rb-done     { background: rgba(22,163,74,0.10);  color: #16a34a; }
+.rb-tbd      { background: rgba(0,0,0,0.05); color: var(--muted); }
+.rb-upcoming { background: rgba(15,75,143,0.07); color: var(--muted); }
+
+.rtog { font-size: 12px; color: var(--muted); transition: transform 0.2s; flex-shrink: 0; }
+.round-section.open .rtog { transform: rotate(180deg); }
+
+.round-body { display: none; padding: 10px 12px 12px; }
+.round-section.open .round-body { display: block; }
+
+/* Mobile match card */
+.mobile-match {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 6px var(--shadow);
+}
+.mobile-match:last-child { margin-bottom: 0; }
+.mobile-match.live     { background: #fff8f5; border-color: rgba(214,50,0,0.3); }
+.mobile-match.finished { opacity: 0.88; }
+
+.mobile-teams { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mobile-team  { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+.mobile-flag  { font-size: 26px; line-height: 1; }
+.mobile-name  { font-size: 14px; font-weight: 700; color: var(--fg); text-align: center; line-height: 1.3; }
+.mobile-name.seed { font-size: 12px; color: var(--accent-2); font-weight: 600; }
+.mobile-name.tbd  { color: var(--muted); font-weight: 400; font-style: italic; font-size: 12px; }
+
+.mobile-center { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+.mobile-score  { font-size: 26px; font-weight: 800; color: var(--fg); letter-spacing: 3px; }
+.mobile-score.live { color: var(--live-color); }
+.mobile-time   { font-size: 20px; font-weight: 300; color: var(--accent); }
+
+.live-badge { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--live-color); letter-spacing: 0.8px; }
+.live-dot   { width: 7px; height: 7px; border-radius: 50%; background: var(--live-color); animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.15; } }
+
+/* Mobile groups section */
+.mobile-groups-wrap {
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  padding: 10px 12px 12px;
+}
+.mobile-groups-title {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.5px; text-transform: uppercase;
+  padding-bottom: 8px;
+}
+.mobile-groups-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.mobile-group-box {
+  border: 2px solid var(--gc, #aaa);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.mobile-group-flags {
+  display: grid; grid-template-columns: 1fr 1fr;
+  place-items: center; padding: 4px; gap: 1px;
+}
+.mobile-group-flags span { font-size: 15px; line-height: 1; }
+.mobile-group-name {
+  background: var(--gc, #aaa); color: #fff;
+  font-size: 8px; font-weight: 900;
+  text-align: center; padding: 2px;
+  letter-spacing: 0.3px; text-transform: uppercase;
+}
+
+.mobile-seed-legend {
+  padding: 10px 12px;
+  font-size: 11px; color: var(--muted);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  line-height: 1.7;
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="page-header">
+    <span class="page-header-title">🏆 FIFA 世界杯 2026 賽程樹</span>
+    <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+  </header>
+
+  <div id="bracket-desktop" class="bracket-desktop">
+    <div class="bracket-panel"><div class="state-msg">載入中…</div></div>
+  </div>
+</div>
+
+<script>
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxB_BEJ2ldNqFfBnKrnC6aP51--jfkU4lvXuTjdByAF10FMiE92ys7IxlsiNwtV7fJDtQ/exec';
+const CACHE_TTL = 300;
+
+/* ── Group static data ─────────────────────────── */
+const GROUPS_INFO = {
+  A: { color: '#00c65e', teams: [['🇲🇽','墨西哥'],['🇿🇦','南非'],['🇰🇷','韓國'],['🇨🇿','捷克']] },
+  B: { color: '#ff1744', teams: [['🇨🇦','加拿大'],['🇧🇦','波士尼亞'],['🇨🇭','瑞士'],['🇶🇦','卡達']] },
+  C: { color: '#ff8c00', teams: [['🇧🇷','巴西'],['🇲🇦','摩洛哥'],['🇭🇹','海地'],['🏴󠁧󠁢󠁳󠁣󠁴󠁿','蘇格蘭']] },
+  D: { color: '#1565c0', teams: [['🇺🇸','美國'],['🇵🇾','巴拉圭'],['🇦🇺','澳洲'],['🇹🇷','土耳其']] },
+  E: { color: '#7b1fa2', teams: [['🇩🇪','德國'],['🇨🇮','象牙海岸'],['🇪🇨','厄瓜多'],['🇨🇼','庫拉索']] },
+  F: { color: '#aeea00', teams: [['🇳🇱','荷蘭'],['🇯🇵','日本'],['🇸🇪','瑞典'],['🇹🇳','突尼西亞']] },
+  G: { color: '#ff1493', teams: [['🇪🇸','西班牙'],['🇨🇻','維德角'],['🇸🇦','沙烏地阿拉伯'],['🇺🇾','烏拉圭']] },
+  H: { color: '#00e5d4', teams: [['🇧🇪','比利時'],['🇪🇬','埃及'],['🇮🇷','伊朗'],['🇳🇿','紐西蘭']] },
+  I: { color: '#9c27b0', teams: [['🇦🇷','阿根廷'],['🇩🇿','阿爾及利亞'],['🇦🇹','奧地利'],['🇯🇴','約旦']] },
+  J: { color: '#00897b', teams: [['🇫🇷','法國'],['🇸🇳','塞內加爾'],['🇮🇶','伊拉克'],['🇳🇴','挪威']] },
+  K: { color: '#f4511e', teams: [['🏴󠁧󠁢󠁥󠁮󠁧󠁿','英格蘭'],['🇬🇭','迦納'],['🇵🇦','巴拿馬'],['🇭🇷','克羅埃西亞']] },
+  L: { color: '#00b0ff', teams: [['🇵🇹','葡萄牙'],['🇺🇿','烏茲別克'],['🇨🇴','哥倫比亞'],['🇨🇩','剛果']] },
+};
+
+/* ── R32 seeding (WC 2026 official bracket) ─── */
+const R32_SEEDS = {
+  73: ['1E','3 ABCDF'], 74: ['1I','3 CDFGH'],
+  75: ['2A','2B'],      76: ['1F','2C'],
+  77: ['2K','2L'],      78: ['1H','2J'],
+  79: ['1D','3 BEFIJ'], 80: ['1G','3 AEHIJ'],
+  81: ['1C','2F'],      82: ['2E','2I'],
+  83: ['1A','3 CEFHI'], 84: ['1L','3 EHIJK'],
+  85: ['1J','2H'],      86: ['2D','2G'],
+  87: ['1B','3 EFGIJ'], 88: ['1K','3 DEIJL'],
+};
+
+/* Convert raw seed code to readable Chinese label */
+function formatSeed(code) {
+  if (!code) return '';
+  const m1 = code.match(/^([12])([A-L])$/);
+  if (m1) return `${m1[2]}組第${m1[1]}`;
+  const m3 = code.match(/^3\s*([A-L]+)$/);
+  if (m3) return `3名(${m3[1]})`;
+  return code;
+}
+
+const PHASE_R32='32強', PHASE_R16='16強', PHASE_QF='8強',
+      PHASE_SF='4強',   PHASE_3RD='季軍賽', PHASE_F='決賽';
+
+const PHASE_LABELS = {
+  [PHASE_R32]:'32強', [PHASE_R16]:'16強', [PHASE_QF]:'8強（準決賽）',
+  [PHASE_SF]:'4強（半決賽）', [PHASE_3RD]:'季軍賽', [PHASE_F]:'決賽',
+};
+
+/* ── Cache ─────────────────────────────────────── */
+function cacheGet(k) {
+  try {
+    const r = sessionStorage.getItem(k);
+    if (!r) return null;
+    const { ts, data } = JSON.parse(r);
+    return Date.now() - ts < CACHE_TTL * 1000 ? data : null;
+  } catch { return null; }
+}
+function cacheSet(k, d) {
+  try { sessionStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
+}
+async function fetchAllMatches() {
+  const hit = cacheGet('wc26_all');
+  if (hit) return hit;
+  const res  = await fetch(`${GAS_URL}?action=getMatches`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.status === 'error') throw new Error(json.message);
+  cacheSet('wc26_all', json.data);
+  return json.data;
+}
+
+/* ── Phase helpers ─────────────────────────────── */
+function isTBD(t) { return !t.code && !t.name; }
+function teamName(t) { return t.name || t.code || ''; }
+
+function isAllTBD(ms)  { return ms.length > 0 && ms.every(m => isTBD(m.team1) && isTBD(m.team2)); }
+function isAllDone(ms) { return ms.length > 0 && ms.every(m => m.status === 'finished'); }
+
+function getActivePhase(matches) {
+  const order = [PHASE_R32, PHASE_R16, PHASE_QF, PHASE_SF, PHASE_F];
+  for (const p of order)
+    if (matches.some(m => m.phase === p && m.status === 'live')) return p;
+  for (const p of order)
+    if (matches.some(m => m.phase === p && m.status === 'upcoming')) return p;
+  return PHASE_F;
+}
+
+/* ── Match node ────────────────────────────────── */
+function buildNode(m) {
+  const fin = m.status === 'finished';
+  const liv = m.status === 'live';
+  let cls = 'match-node';
+  if (fin) cls += ' finished';
+  if (liv) cls += ' live';
+
+  function row(t, score, idx) {
+    const tbd  = isTBD(t);
+    const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
+    const label = seed ? formatSeed(seed) : (tbd ? '' : teamName(t));
+    const nameCls = seed ? 'seed' : (tbd ? 'tbd' : '');
+    const flagHtml = tbd ? '' : `<span class="mn-flag">${t.flag}</span>`;
+
+    let scoreHtml = '';
+    if ((fin || liv) && score != null) {
+      const w = fin && ((idx===0 && m.score1 > m.score2) || (idx===1 && m.score2 > m.score1));
+      scoreHtml = `<span class="mn-score${w?' winner':liv?' live':''}">${score}</span>`;
+    }
+    return `<div class="mn-row">
+      ${flagHtml}<span class="mn-name${nameCls?' '+nameCls:''}">${label||'待定'}</span>${scoreHtml}
+    </div>`;
+  }
+
+  return `<div class="${cls}">${row(m.team1,m.score1,0)}${row(m.team2,m.score2,1)}</div>`;
+}
+
+function emptyNode() {
+  return `<div class="match-node">
+    <div class="mn-row"><span class="mn-name tbd">待定</span></div>
+    <div class="mn-row"><span class="mn-name tbd">待定</span></div>
+  </div>`;
+}
+
+/* ── Center split slot (one team row for Final/Bronze) ── */
+function buildCenterSlot(m, teamIdx) {
+  if (!m) {
+    return `<div class="center-slot"><span class="mn-name tbd">待定</span></div>`;
+  }
+  const t = teamIdx === 0 ? m.team1 : m.team2;
+  const score = teamIdx === 0 ? m.score1 : m.score2;
+  const oppScore = teamIdx === 0 ? m.score2 : m.score1;
+  const fin = m.status === 'finished';
+  const liv = m.status === 'live';
+  const tbd = isTBD(t);
+
+  let scoreHtml = '';
+  if ((fin || liv) && score != null) {
+    const w = fin && score > oppScore;
+    scoreHtml = `<span class="mn-score${w ? ' winner' : liv ? ' live' : ''}">${score}</span>`;
+  }
+  return `<div class="center-slot">
+    <span class="mn-flag">${tbd ? '' : t.flag}</span>
+    <span class="mn-name${tbd ? ' tbd' : ''}">${tbd ? '待定' : teamName(t)}</span>
+    ${scoreHtml}
+  </div>`;
+}
+
+/* ── Group box ─────────────────────────────────── */
+function groupBox(letter, sz) {
+  const g = GROUPS_INFO[letter];
+  const isSmall = sz === 'sm';
+  if (isSmall) {
+    return `<div class="mobile-group-box" style="--gc:${g.color}">
+      <div class="mobile-group-flags">
+        ${g.teams.map(([f])=>`<span>${f}</span>`).join('')}
+      </div>
+      <div class="mobile-group-name">GROUP ${letter}</div>
+    </div>`;
+  }
+  const rows = g.teams.map(([flag, name]) =>
+    `<div class="gb-row"><span class="gb-flag">${flag}</span><span class="gb-name">${name}</span></div>`
+  ).join('');
+  return `<div class="group-box" style="--gc:${g.color}">
+    <div class="group-name">${letter}</div>
+    <div class="gb-teams">${rows}</div>
+  </div>`;
+}
+
+/* ── Desktop rendering ─────────────────────────── */
+function renderDesktop(matches) {
+  const bp = {};
+  matches.forEach(m => { (bp[m.phase] ??= []).push(m); });
+
+  const r32=bp[PHASE_R32]||[], r16=bp[PHASE_R16]||[];
+  const qf=bp[PHASE_QF]||[],   sf=bp[PHASE_SF]||[];
+  const fin=(bp[PHASE_F]||[])[0], t3=(bp[PHASE_3RD]||[])[0];
+
+  const r32L=r32.slice(0,8), r32R=r32.slice(8,16);
+  const r16L=r16.slice(0,4), r16R=r16.slice(4,8);
+  const qfL=qf.slice(0,2),   qfR=qf.slice(2,4);
+  const sfL=sf[0],            sfR=sf[1];
+
+  const COL_W = 92;   // R32/R16/QF/SF columns
+  const FIN_W = 82;   // Final columns (one team each side)
+  const GRP_W = 68;
+  const CEN_W = 76;   // Trophy only
+  const COL_C = 26;
+
+  // Wrap leading digits with text-combine-upright so "32強" renders as ㉜強 (tate-chu-yoko)
+  function tcyLabel(label) {
+    return label.replace(/^(\d+)/, '<span class="tcy">$1</span>');
+  }
+
+  function col(ms, collapsed, roundLabel) {
+    const pairs = [];
+    for (let i = 0; i < ms.length; i += 2) {
+      const m1 = ms[i], m2 = ms[i+1];
+      pairs.push(`<div class="match-pair">
+        <div class="match-slot">${buildNode(m1)}</div>
+        <div class="match-slot">${m2 ? buildNode(m2) : emptyNode()}</div>
+      </div>`);
+    }
+    const cls = collapsed ? ' collapsed' : '';
+    const grip = `<div class="col-grip" onclick="toggleDesktopCol(this.closest('.round-col'));event.stopPropagation()" title="收合 ${roundLabel}">⟨</div>`;
+    return `<div class="round-col${cls}" style="width:${COL_W}px" data-col-w="${COL_W}" data-label="${roundLabel}" onclick="toggleDesktopCol(this)">
+      <div class="col-dots" title="點擊展開 ${roundLabel}">
+        <span class="col-dots-ellipsis">${tcyLabel(roundLabel)}</span>
+      </div>
+      <div class="col-content-wrap">
+        <div class="col-content">${pairs.join('')}</div>
+        ${grip}
+      </div>
+    </div>`;
+  }
+
+  function sfCol(m, collapsed, roundLabel) {
+    const cls = collapsed ? ' collapsed' : '';
+    const grip = `<div class="col-grip" onclick="toggleDesktopCol(this.closest('.round-col'));event.stopPropagation()" title="收合 ${roundLabel}">⟨</div>`;
+    return `<div class="round-col${cls}" style="width:${COL_W}px" data-col-w="${COL_W}" data-label="${roundLabel}" onclick="toggleDesktopCol(this)">
+      <div class="col-dots" title="點擊展開 ${roundLabel}">
+        <span class="col-dots-ellipsis">${tcyLabel(roundLabel)}</span>
+      </div>
+      <div class="col-content-wrap">
+        <div class="col-content">
+          <div class="match-slot-single">${m ? buildNode(m) : emptyNode()}</div>
+        </div>
+        ${grip}
+      </div>
+    </div>`;
+  }
+
+  const leftGroups  = 'ABCDEF'.split('');
+  const rightGroups = 'GHIJKL'.split('');
+
+  const legendHtml = `<div class="seed-legend">
+    <strong>賽位代號說明：</strong>
+    「A組第1」= A 組第 1 名出線；「3名(ABCDF)」= 從 A/B/C/D/F 組中成績最佳的第 3 名（共 12 組取 8 支第 3 名晉級）
+  </div>`;
+
+  const mobile = window.innerWidth < 660;
+
+  // Mobile: expand active phase + next phase, collapse everything else
+  const EXPAND_MAP = {
+    [PHASE_R32]: new Set([PHASE_R32, PHASE_R16]),
+    [PHASE_R16]: new Set([PHASE_R16, PHASE_QF]),
+    [PHASE_QF]:  new Set([PHASE_QF,  PHASE_SF]),
+    [PHASE_SF]:  new Set([PHASE_SF,  PHASE_F]),
+    [PHASE_F]:   new Set([PHASE_F]),
+  };
+  const activePhase = getActivePhase(matches);
+  const mobileOpen  = mobile ? (EXPAND_MAP[activePhase] || new Set()) : null;
+
+  const collapseRound = (phase, arr) =>
+    mobile ? true : isAllTBD(arr);
+
+  const r32LCol = collapseRound(PHASE_R32, r32L);
+  const r16LCol = collapseRound(PHASE_R16, r16L);
+  const qfLCol  = collapseRound(PHASE_QF,  qfL);
+  const sfLCol  = collapseRound(PHASE_SF,  [sfL].filter(Boolean));
+  const sfRCol  = collapseRound(PHASE_SF,  [sfR].filter(Boolean));
+  const qfRCol  = collapseRound(PHASE_QF,  qfR);
+  const r16RCol = collapseRound(PHASE_R16, r16R);
+  const r32RCol = collapseRound(PHASE_R32, r32R);
+
+  // Final single-team column (left = team1, right = team2)
+  function finalSingleCol(m, teamIdx) {
+    const t     = m ? (teamIdx === 0 ? m.team1 : m.team2) : null;
+    const score = m ? (teamIdx === 0 ? m.score1 : m.score2) : null;
+    const opp   = m ? (teamIdx === 0 ? m.score2 : m.score1) : null;
+    const fin   = m?.status === 'finished';
+    const liv   = m?.status === 'live';
+    const tbd   = !t || isTBD(t);
+    const win   = fin && score != null && score > opp;
+    let scoreHtml = '';
+    if ((fin || liv) && score != null)
+      scoreHtml = `<span class="mn-score${win?' winner':liv?' live':''}">${score}</span>`;
+    const node = `<div class="match-node${fin?' finished':liv?' live':''}">
+      <div class="mn-row">
+        <span class="mn-flag">${tbd?'':t.flag}</span>
+        <span class="mn-name${tbd?' tbd':''}">${tbd?'待定':teamName(t)}</span>
+        ${scoreHtml}
+      </div>
+    </div>`;
+    const finCls = collapseRound(PHASE_F, m ? [m] : []) ? ' collapsed' : '';
+    const grip = `<div class="col-grip" onclick="toggleDesktopCol(this.closest('.round-col'));event.stopPropagation()" title="收合決賽">⟨</div>`;
+    return `<div class="round-col${finCls}" style="width:${FIN_W}px" data-col-w="${FIN_W}" data-label="決賽" onclick="toggleDesktopCol(this)">
+      <div class="col-dots" title="點擊展開決賽">
+        <span class="col-dots-ellipsis">決賽</span>
+      </div>
+      <div class="col-content-wrap">
+        <div class="col-content"><div class="match-slot-single">${node}</div></div>
+        ${grip}
+      </div>
+    </div>`;
+  }
+
+  // Trophy center (winner only)
+  function trophyCenter() {
+    let innerHtml = '';
+    if (fin && fin.status === 'finished') {
+      const w = fin.score1 > fin.score2 ? fin.team1 : fin.team2;
+      innerHtml = `<div class="champion-flag">${w.flag}</div><div class="champion-name">${teamName(w)}</div>`;
+    } else {
+      innerHtml = `<div class="center-tbd">待定</div>`;
+    }
+    return `<div class="bracket-center" style="width:${CEN_W}px">
+      <div class="center-content">
+        <span class="trophy-icon">🏆</span>
+        ${innerHtml}
+      </div>
+      <div class="center-nav">
+        <button class="cnav-btn" data-round="fin" onclick="mobileToggleRound('fin',this)">決賽</button>
+        <button class="cnav-btn" data-round="sf"  onclick="mobileToggleRound('sf',this)">4強</button>
+        <button class="cnav-btn" data-round="qf"  onclick="mobileToggleRound('qf',this)">8強</button>
+        <button class="cnav-btn" data-round="r16" onclick="mobileToggleRound('r16',this)">16強</button>
+        <button class="cnav-btn" data-round="r32" onclick="mobileToggleRound('r32',this)">32強</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="bracket-panel">
+    <div class="bracket-outer-wrap">
+    <div class="bracket-outer">
+      <div class="bracket-inner">
+      <div class="bracket-tree">
+        <div class="groups-col" style="width:${GRP_W}px">
+          ${leftGroups.map(l=>groupBox(l)).join('')}
+        </div>
+        <div class="bracket-left" style="display:contents">
+          ${col(r32L, r32LCol, '32強')}
+          ${col(r16L, r16LCol, '16強')}
+          ${col(qfL,  qfLCol,  '8強')}
+          ${sfCol(sfL, sfLCol, '4強')}
+          ${finalSingleCol(fin, 0)}
+        </div>
+        ${trophyCenter()}
+        <div class="bracket-right" style="display:contents">
+          ${finalSingleCol(fin, 1)}
+          ${sfCol(sfR, sfRCol, '4強')}
+          ${col(qfR,  qfRCol,  '8強')}
+          ${col(r16R, r16RCol, '16強')}
+          ${col(r32R, r32RCol, '32強')}
+        </div>
+        <div class="groups-col right-col" style="width:${GRP_W}px">
+          ${rightGroups.map(l=>groupBox(l)).join('')}
+        </div>
+      </div>
+      </div>
+    </div>
+    </div>
+    ${legendHtml}
+  </div>`;
+}
+
+function mobileCenterScroll() {
+  const outer = document.querySelector('.bracket-outer');
+  const inner = document.querySelector('.bracket-inner');
+  if (!outer || !inner) return;
+  // Scroll so bracket-inner is horizontally centered in bracket-outer
+  outer.scrollLeft = Math.max(0, (inner.offsetWidth - outer.clientWidth) / 2);
+}
+
+function fitBracket() {
+  const inner = document.querySelector('.bracket-inner');
+  const outer = document.querySelector('.bracket-outer');
+  if (!inner || !outer) return;
+
+
+  // Reset to measure natural size
+  inner.style.transform = 'none';
+  inner.style.marginTop = '0';
+  inner.style.marginBottom = '0';
+  outer.classList.remove('fit-scroll');
+
+  const naturalW = inner.offsetWidth;
+  const naturalH = inner.offsetHeight;
+  const availW   = outer.clientWidth;
+  const availH   = outer.clientHeight;
+
+  if (!naturalW || !naturalH || !availW || !availH) return;
+
+  const scaleW = availW / naturalW;
+  const scaleH = availH / naturalH;
+  const scale  = Math.min(scaleW, scaleH);
+
+  if (scale >= 1) {
+    // Content fits — scale up to fill frame
+    inner.style.transform = `scale(${scale})`;
+    inner.style.transformOrigin = 'center center';
+    const diff = (naturalH * scale - naturalH) / 2;
+    inner.style.marginTop    = diff + 'px';
+    inner.style.marginBottom = diff + 'px';
+  } else {
+    // Content wider than frame — keep natural size, enable scroll, center
+    outer.classList.add('fit-scroll');
+    requestAnimationFrame(() => {
+      outer.scrollLeft = Math.max(0, (naturalW - availW) / 2);
+    });
+  }
+}
+
+window.addEventListener('resize', fitBracket);
+
+
+const ROUND_PHASE_MAP = {
+  fin: '決賽', sf: '4強', qf: '8強', r16: '16強', r32: '32強'
+};
+
+function mobileToggleRound(round, btn) {
+  const label = ROUND_PHASE_MAP[round];
+  const cols = Array.from(document.querySelectorAll('.bracket-tree .round-col'))
+    .filter(c => c.dataset.label === label);
+  if (!cols.length) return;
+  const willCollapse = !cols[0].classList.contains('collapsed');
+  cols.forEach(c => c.classList.toggle('collapsed', willCollapse));
+  btn.classList.toggle('active', !willCollapse);
+  requestAnimationFrame(fitBracket);
+}
+
+function syncMobileNavButtons() {
+  const allCols = Array.from(document.querySelectorAll('.bracket-tree .round-col'));
+  Object.entries(ROUND_PHASE_MAP).forEach(([round, label]) => {
+    const cols = allCols.filter(c => c.dataset.label === label);
+    const isOpen = cols.length > 0 && !cols[0].classList.contains('collapsed');
+    const btn = document.querySelector(`.cnav-btn[data-round="${round}"]`);
+    if (btn) btn.classList.toggle('active', isOpen);
+  });
+}
+
+function toggleDesktopCol(col) {
+  const allCols = Array.from(document.querySelectorAll('.bracket-tree .round-col'));
+  const idx = allCols.indexOf(col);
+  const mirrorIdx = 9 - idx;
+  const willCollapse = !col.classList.contains('collapsed');
+
+  [idx, mirrorIdx].forEach(ci => {
+    const c = allCols[ci];
+    if (!c) return;
+    c.classList.toggle('collapsed', willCollapse);
+  });
+  requestAnimationFrame(fitBracket);
+}
+
+/* ── Mobile match card ─────────────────────────── */
+function buildMobileMatch(m) {
+  const fin = m.status === 'finished';
+  const liv = m.status === 'live';
+  let cls = 'mobile-match';
+  if (fin) cls += ' finished';
+  if (liv) cls += ' live';
+
+  let center = '';
+  if (fin)      center = `<div class="mobile-score">${m.score1}&thinsp;:&thinsp;${m.score2}</div>`;
+  else if (liv) center = `<div class="live-badge"><span class="live-dot"></span>LIVE</div>
+                           <div class="mobile-score live">${m.score1??'?'}&thinsp;:&thinsp;${m.score2??'?'}</div>`;
+  else          center = `<div class="mobile-time">${m.time_utc8}</div>`;
+
+  function mTeam(t, idx) {
+    const tbd  = isTBD(t);
+    const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
+    const label = seed ? formatSeed(seed) : (tbd ? '待定' : teamName(t));
+    const nc = seed ? ' seed' : (tbd ? ' tbd' : '');
+    return `<div class="mobile-team">
+      <span class="mobile-flag">${tbd ? '❓' : t.flag}</span>
+      <span class="mobile-name${nc}">${label}</span>
+    </div>`;
+  }
+
+  return `<div class="${cls}">
+    <div class="mobile-teams">
+      ${mTeam(m.team1,0)}
+      <div class="mobile-center">${center}</div>
+      ${mTeam(m.team2,1)}
+    </div>
+  </div>`;
+}
+
+/* ── Mobile rendering ──────────────────────────── */
+function renderMobile(matches, activePhase) {
+  const bp = {};
+  matches.forEach(m => { (bp[m.phase] ??= []).push(m); });
+
+  function badge(phase, ms) {
+    if (phase === activePhase)  return '<span class="round-badge rb-active">進行中</span>';
+    if (isAllDone(ms))          return '<span class="round-badge rb-done">✓ 結束</span>';
+    if (isAllTBD(ms))           return '<span class="round-badge rb-tbd">待定</span>';
+    return '<span class="round-badge rb-upcoming">即將</span>';
+  }
+
+  function shouldOpen(phase, ms) {
+    if (phase === activePhase) return true;
+    return !isAllDone(ms) && !isAllTBD(ms);
+  }
+
+  const orderedPhases = [PHASE_R32, PHASE_R16, PHASE_QF, PHASE_SF, PHASE_F, PHASE_3RD];
+  const sections = orderedPhases.map(phase => {
+    const ms = bp[phase] || [];
+    if (!ms.length || phase === PHASE_3RD) return '';
+
+    const label = PHASE_LABELS[phase] || phase;
+    const open  = shouldOpen(phase, ms);
+    let cards   = ms.map(m => buildMobileMatch(m)).join('');
+
+    if (phase === PHASE_F) {
+      const t3 = bp[PHASE_3RD] || [];
+      if (t3.length) cards += `<div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--muted);padding:2px 0">季軍賽</div>${t3.map(m=>buildMobileMatch(m)).join('')}`;
+    }
+
+    return `<section class="round-section${open?' open':''}" data-phase="${phase}">
+      <button class="round-toggle-btn" onclick="toggleRound(this)">
+        <div class="rtl"><span class="rtl-label">${label}</span>${badge(phase,ms)}</div>
+        <span class="rtog">▼</span>
+      </button>
+      <div class="round-body">${cards}</div>
+    </section>`;
+  }).join('');
+
+  const groupBoxes = 'ABCDEFGHIJKL'.split('').map(l => groupBox(l,'sm')).join('');
+
+  const legendHtml = `<div class="mobile-seed-legend">
+    <strong>代號說明：</strong>「A組第1」= A 組第 1 名；「3名(ABCDF)」= ABCDF 組最佳第 3 名（取 8 支）
+  </div>`;
+
+  return `<div class="mobile-panel">
+    ${sections}
+    <div class="mobile-groups-wrap">
+      <div class="mobile-groups-title">分組</div>
+      <div class="mobile-groups-grid">${groupBoxes}</div>
+    </div>
+    ${legendHtml}
+  </div>`;
+}
+
+function toggleRound(btn) {
+  btn.closest('.round-section').classList.toggle('open');
+}
+
+/* ── Init ──────────────────────────────────────── */
+async function init() {
+  if (!GAS_URL) {
+    document.getElementById('bracket-desktop').innerHTML =
+      '<div class="bracket-panel"><div class="state-msg state-error">資料來源未設定</div></div>';
+    return;
+  }
+  let all;
+  try { all = await fetchAllMatches(); }
+  catch {
+    document.getElementById('bracket-desktop').innerHTML =
+      '<div class="bracket-panel"><div class="state-msg state-error">資料載入失敗，請稍後重試</div></div>';
+    return;
+  }
+
+  const ko = all.filter(m => [PHASE_R32,PHASE_R16,PHASE_QF,PHASE_SF,PHASE_3RD,PHASE_F].includes(m.phase));
+  const activePhase = getActivePhase(ko);
+
+  document.getElementById('bracket-desktop').innerHTML = renderDesktop(ko);
+  // Sync mobile nav button active states after render
+  if (window.innerWidth < 660) syncMobileNavButtons();
+  requestAnimationFrame(fitBracket);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -36,11 +36,18 @@ body {
 }
 button { font-family: inherit; cursor: pointer; border: none; }
 
+/* ── CNA Logo ── */
+.cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+
 /* ── Wrapper ── */
 .wrapper {
-  max-width: 680px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 14px 14px 20px;
+  padding: 14px 14px 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Main panel ── */
@@ -50,7 +57,14 @@ button { font-family: inherit; cursor: pointer; border: none; }
   border: 1px solid var(--border);
   box-shadow: 0 10px 30px var(--shadow);
   overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
+
+/* ── App container ── */
+#app { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 
 /* ── Header ── */
 .header {
@@ -62,6 +76,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .header-title {
   font-size: 17px; font-weight: 700; color: #fff;
   letter-spacing: 0.2px; line-height: 1.3;
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .header-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .btn-action {
@@ -81,23 +96,24 @@ button { font-family: inherit; cursor: pointer; border: none; }
 /* ── Date nav ── */
 .date-nav {
   display: flex; align-items: center;
-  padding: 10px 12px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
-  gap: 2px;
+  gap: 0;
+  overflow: hidden; /* ensure no overflow */
 }
 .nav-arrow {
   background: none; border: none;
-  font-size: 22px; color: var(--accent); padding: 4px 6px;
+  font-size: 20px; color: var(--accent); padding: 4px 4px;
   flex-shrink: 0; line-height: 1; border-radius: 8px;
   transition: background 0.12s;
 }
 .nav-arrow:hover { background: var(--accent-soft); }
-.date-tabs { display: flex; flex: 1; justify-content: space-around; }
+.date-tabs { display: flex; flex: 1; justify-content: space-around; overflow: hidden; }
 .date-tab {
   display: flex; flex-direction: column; align-items: center;
-  padding: 5px 6px; border-radius: 10px; border: none; background: none;
-  min-width: 40px; color: var(--muted);
+  padding: 5px 2px; border-radius: 10px; border: none; background: none;
+  flex: 1; min-width: 0; color: var(--muted);
   transition: background 0.12s, color 0.12s;
 }
 .date-tab:hover { background: var(--accent-soft); color: var(--fg); }
@@ -110,9 +126,17 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .date-tab.active .dy { font-weight: 700; }
 .date-tab .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-2); margin-top: 4px; }
 .date-tab .dot-placeholder { width: 5px; height: 5px; margin-top: 4px; }
+.date-tab .month-label { font-size: 9px; font-weight: 700; color: var(--accent-2); letter-spacing: 0.2px; min-height: 12px; line-height: 12px; }
+.date-nav-month { font-size: 11px; font-weight: 700; color: var(--accent); flex-shrink: 0; padding: 0 4px; }
 
 /* ── Match list ── */
-.match-list { padding: 12px 14px 14px; }
+.match-list {
+  padding: 12px 14px 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .day-header { padding: 4px 0 10px; }
 .day-header-title { font-size: 13px; font-weight: 600; color: var(--muted); }
 
@@ -267,7 +291,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 <script>
 // ── 部署時修改這裡 ───────────────────────────
 const GAS_URL      = 'https://script.google.com/macros/s/AKfycbxB_BEJ2ldNqFfBnKrnC6aP51--jfkU4lvXuTjdByAF10FMiE92ys7IxlsiNwtV7fJDtQ/exec';   // GAS Web App 部署 URL
-const CACHE_TTL    = 60;   // 快取秒數
+const CACHE_TTL    = 300;  // 快取秒數
 const LIVE_REFRESH = 60;   // live 場次自動刷新秒數
 // ────────────────────────────────────────────
 
@@ -412,13 +436,12 @@ function renderShell() {
       <span class="header-title">⚽ FIFA 世界杯 2026 賽程</span>
       <div class="header-actions">
         <button class="btn-action test" id="btn-test">測試比分</button>
-        <button class="btn-action" id="btn-groups">查看分組</button>
+        <img src="cna_logo.svg" class="cna-logo" alt="CNA">
       </div>
     </div>
     <div class="date-nav" id="date-nav"></div>
     <div class="match-list" id="match-list"></div>
   `;
-  document.getElementById('btn-groups').addEventListener('click', openOverlay);
   document.getElementById('btn-test').addEventListener('click', () => {
     if (!allMatches.length) return;
     const m = allMatches[0];
@@ -437,7 +460,7 @@ function renderShell() {
 // ─── Render: date nav ─────────────────────────
 
 function renderDateNav() {
-  const nav       = document.getElementById('date-nav');
+  const nav        = document.getElementById('date-nav');
   if (!nav) return;
   const matchDates = getMatchDateSet();
 
@@ -446,20 +469,41 @@ function renderDateNav() {
     const ymd      = toYMD(d);
     const wd       = WEEKDAYS[d.getDay()];
     const dayNum   = d.getDate();
+    const month    = d.getMonth() + 1;
     const hasMatch = matchDates.has(ymd);
     const isActive = ymd === activeDate;
-    return { ymd, wd, dayNum, hasMatch, isActive };
+    return { ymd, wd, dayNum, month, hasMatch, isActive };
   });
+
+  // Determine month display strategy
+  const uniqueMonths = [...new Set(tabs.map(t => t.month))];
+  const isCrossMonth = uniqueMonths.length > 1;
+
+  // When cross-month: mark tabs that start a new month (i > 0)
+  const showMonthAt = new Set();
+  if (isCrossMonth) {
+    let prev = tabs[0].month;
+    for (let i = 1; i < tabs.length; i++) {
+      if (tabs[i].month !== prev) { showMonthAt.add(i); prev = tabs[i].month; }
+    }
+  }
+
+  // Single-month: show month name beside left arrow
+  const singleMonthHtml = !isCrossMonth
+    ? `<span class="date-nav-month">${tabs[0].month}月</span>`
+    : '';
 
   nav.innerHTML = `
     <button class="nav-arrow" id="nav-prev" aria-label="前一週">&#8249;</button>
+    ${singleMonthHtml}
     <div class="date-tabs" role="tablist">
-      ${tabs.map(({ ymd, wd, dayNum, hasMatch, isActive }) => `
+      ${tabs.map(({ ymd, wd, dayNum, month, hasMatch, isActive }, i) => `
         <button class="date-tab${isActive ? ' active' : ''}"
                 data-date="${ymd}"
                 role="tab"
                 aria-selected="${isActive}"
                 aria-label="${ymd}">
+          <span class="month-label">${showMonthAt.has(i) ? `${month}月` : ''}</span>
           <span class="wd">${wd}</span>
           <span class="dy">${dayNum}</span>
           ${hasMatch ? '<span class="dot"></span>' : '<span class="dot-placeholder"></span>'}
@@ -474,6 +518,15 @@ function renderDateNav() {
   );
   document.getElementById('nav-prev').addEventListener('click', () => shiftWindow(-7));
   document.getElementById('nav-next').addEventListener('click', () => shiftWindow(7));
+
+  scrollToActiveTab();
+}
+
+function scrollToActiveTab() {
+  const activeTab = document.querySelector('.date-tab.active');
+  if (activeTab) {
+    activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
 }
 
 // ─── Render: match list ───────────────────────
