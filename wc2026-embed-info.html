@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WC2026 互動圖表 — 嵌入代碼</title>
+<style>
+:root {
+  --bg: #f0f4f8;
+  --surface: #ffffff;
+  --accent: #0f4b8f;
+  --accent-2: #2c73c9;
+  --fg: #1f2937;
+  --muted: #66758a;
+  --border: rgba(15,50,96,0.12);
+  --success: #16a34a;
+  --code-bg: #1e2a38;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.page { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
+
+.page-header {
+  background: linear-gradient(180deg, #13579f 0%, #0f4b8f 100%);
+  border-radius: 16px;
+  padding: 24px 28px;
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 32px;
+}
+.page-header-logo { height: 28px; filter: brightness(0) invert(1); opacity: 0.9; }
+.page-header-text h1 { font-size: 20px; font-weight: 800; color: #fff; }
+.page-header-text p  { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+
+.base-url-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 28px;
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap;
+}
+.base-url-box label { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.base-url-box input {
+  flex: 1; min-width: 280px;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; font-family: monospace;
+  background: var(--bg); color: var(--fg);
+}
+.base-url-box button {
+  padding: 8px 16px; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.base-url-box button:hover { background: var(--accent-2); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(15,75,143,0.06);
+}
+.card-header {
+  background: linear-gradient(180deg, #13579f 0%, #0f4b8f 100%);
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-header h2 { font-size: 16px; font-weight: 700; color: #fff; }
+.card-header .tag {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  background: rgba(255,255,255,0.2); color: #fff;
+  padding: 3px 8px; border-radius: 20px;
+}
+.card-body { padding: 20px; }
+.card-meta {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.card-meta-item { font-size: 13px; color: var(--muted); }
+.card-meta-item strong { color: var(--fg); }
+
+.code-block {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+  margin-bottom: 12px;
+}
+.code-block pre {
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  color: #a8c4e0;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+.code-block pre .tag-name  { color: #79c0ff; }
+.code-block pre .attr-name { color: #ffa657; }
+.code-block pre .attr-val  { color: #a5d6ff; }
+.code-block pre .comment   { color: #8b949e; }
+
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  padding: 5px 12px; border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.1); color: #a8c4e0;
+  font-size: 12px; cursor: pointer; transition: all 0.15s;
+}
+.copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.copy-btn.copied { background: var(--success); color: #fff; }
+
+.note {
+  font-size: 13px; color: var(--muted);
+  background: rgba(15,75,143,0.05);
+  border-left: 3px solid var(--accent-2);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+}
+
+.section-title {
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+
+.postmsg-note {
+  background: #fff8ee;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.postmsg-note strong { color: #b45309; }
+
+footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 40px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="page-header">
+    <img src="cna_logo.svg" class="page-header-logo" alt="CNA">
+    <div class="page-header-text">
+      <h1>FIFA 世界杯 2026 — 互動圖表嵌入代碼</h1>
+      <p>供 CNA 記者 / 編輯複製貼上使用 · 更新日期：2026-06-02</p>
+    </div>
+  </header>
+
+  <div class="base-url-box">
+    <label>圖表根目錄 URL：</label>
+    <input type="text" id="baseUrl"
+      value="https://webap.cna.com.tw/missions/embed/wc2026">
+    <button onclick="updateAll()">套用</button>
+  </div>
+
+  <!-- ── 賽程 ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>📅 賽程表</h2>
+      <span class="tag">wc2026-schedule.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>600px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-schedule">
+        <button class="copy-btn" onclick="copyCode('code-schedule', this)">複製</button>
+        <pre id="pre-schedule"></pre>
+      </div>
+      <p class="note">包含自動高度調整腳本，iframe 會隨內容自動撐高。</p>
+    </div>
+  </div>
+
+  <!-- ── 積分榜 ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>🏆 分組積分榜</h2>
+      <span class="tag">wc2026-groups.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>600px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-groups">
+        <button class="copy-btn" onclick="copyCode('code-groups', this)">複製</button>
+        <pre id="pre-groups"></pre>
+      </div>
+      <p class="note">包含 A–L 組完整積分，點選字母按鈕可跳至對應組別。</p>
+    </div>
+  </div>
+
+  <!-- ── 賽程樹 ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>🌳 淘汰賽賽程樹</h2>
+      <span class="tag">wc2026-bracket.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>600px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-bracket">
+        <button class="copy-btn" onclick="copyCode('code-bracket', this)">複製</button>
+        <pre id="pre-bracket"></pre>
+      </div>
+      <p class="note">桌機顯示完整賽程樹，手機版切換為卡片式清單。</p>
+    </div>
+  </div>
+
+  <!-- ── postMessage 說明 ── -->
+  <div class="postmsg-note">
+    <strong>⚡ 自動高度調整說明</strong><br>
+    以上嵌入代碼已內含 <code>postMessage</code> 監聽腳本。圖表載入後會自動傳送實際高度，
+    iframe 會自動撐高至完整內容高度，不需手動設定固定高度。<br><br>
+    若 CNA CMS 不支援內嵌 script，可改用固定高度版本（移除 &lt;script&gt; 區塊，將 height 設為 800）。
+  </div>
+
+  <footer>
+    FIFA World Cup 2026 Interactive Charts · CNA 中央通訊社 ·
+    資料來源：<a href="https://www.football-data.org" target="_blank">football-data.org</a>
+  </footer>
+</div>
+
+<script>
+const CHARTS = [
+  { id: 'schedule', file: 'wc2026-schedule.html', iframeId: 'cna-wc2026-schedule' },
+  { id: 'groups',   file: 'wc2026-groups.html',   iframeId: 'cna-wc2026-groups'   },
+  { id: 'bracket',  file: 'wc2026-bracket.html',  iframeId: 'cna-wc2026-bracket'  },
+];
+
+function buildCode(baseUrl, chart) {
+  return `<div>
+  <iframe
+    id="${chart.iframeId}"
+    src="${baseUrl}/${chart.file}"
+    width="100%"
+    height="600"
+    frameborder="0"
+    scrolling="no"
+    style="border:none;display:block;">
+  </iframe>
+  <script>
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'wc2026-resize') {
+        var f = document.getElementById('${chart.iframeId}');
+        if (f) f.style.height = e.data.height + 'px';
+      }
+    });
+  <\/script>
+</div>`;
+}
+
+function renderAll() {
+  const base = document.getElementById('baseUrl').value.replace(/\/$/, '');
+  CHARTS.forEach(c => {
+    document.getElementById('pre-' + c.id).textContent = buildCode(base, c);
+  });
+}
+
+function updateAll() { renderAll(); }
+
+function copyCode(blockId, btn) {
+  const text = document.getElementById(blockId).querySelector('pre').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '已複製 ✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '複製'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>
