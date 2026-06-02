@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
 <title>FIFA 世界杯 2026 賽程樹</title>
 <style>
 /* ── CNA Design System ── */
@@ -82,7 +82,6 @@ body {
     display: block;
     overflow-x: auto;
     overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
   }
   .bracket-inner { width: max-content; }
   .groups-col { display: none; }
@@ -593,6 +592,9 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 <script>
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
 const CACHE_TTL = 300;
+function parseTwemoji(el) {
+  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+}
 
 /* ── Group static data ─────────────────────────── */
 const GROUPS_INFO = {
@@ -1013,10 +1015,15 @@ const ROUND_PHASE_MAP = {
   fin: '決賽', sf: '4強', qf: '8強', r16: '16強', r32: '32強'
 };
 
+let _cachedCols = null;
+function getRoundCols() {
+  if (!_cachedCols) _cachedCols = Array.from(document.querySelectorAll('.bracket-tree .round-col'));
+  return _cachedCols;
+}
+
 function mobileToggleRound(round, btn) {
   const label = ROUND_PHASE_MAP[round];
-  const cols = Array.from(document.querySelectorAll('.bracket-tree .round-col'))
-    .filter(c => c.dataset.label === label);
+  const cols = getRoundCols().filter(c => c.dataset.label === label);
   if (!cols.length) return;
   const willCollapse = !cols[0].classList.contains('collapsed');
   cols.forEach(c => c.classList.toggle('collapsed', willCollapse));
@@ -1025,7 +1032,7 @@ function mobileToggleRound(round, btn) {
 }
 
 function syncMobileNavButtons() {
-  const allCols = Array.from(document.querySelectorAll('.bracket-tree .round-col'));
+  const allCols = getRoundCols();
   Object.entries(ROUND_PHASE_MAP).forEach(([round, label]) => {
     const cols = allCols.filter(c => c.dataset.label === label);
     const isOpen = cols.length > 0 && !cols[0].classList.contains('collapsed');
@@ -1035,7 +1042,7 @@ function syncMobileNavButtons() {
 }
 
 function toggleDesktopCol(col) {
-  const allCols = Array.from(document.querySelectorAll('.bracket-tree .round-col'));
+  const allCols = getRoundCols();
   const idx = allCols.indexOf(col);
   const mirrorIdx = 9 - idx;
   const willCollapse = !col.classList.contains('collapsed');
@@ -1163,7 +1170,8 @@ async function init() {
   const activePhase = getActivePhase(ko);
 
   document.getElementById('bracket-desktop').innerHTML = renderDesktop(ko);
-  if (typeof twemoji !== 'undefined') twemoji.parse(document.getElementById('bracket-desktop'), { base: 'emoji/', folder: 'svg', ext: '.svg' });
+  _cachedCols = null;
+  parseTwemoji(document.getElementById('bracket-desktop'));
   // Sync mobile nav button active states after render
   if (window.innerWidth < 660) syncMobileNavButtons();
   requestAnimationFrame(fitBracket);

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
 <title>FIFA 世界杯 2026 賽程</title>
 <style>
 /* ── CNA Design System Variables ── */
@@ -139,7 +139,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 .day-header { padding: 4px 0 10px; }
 .day-header-title { font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -209,7 +208,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(15, 23, 42, 0.55); z-index: 9999;
-  overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 .overlay.open { display: flex; align-items: flex-start; justify-content: center; padding: 20px; }
 .overlay-panel {
@@ -304,6 +302,9 @@ const GAS_URL      = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuoz
 const CACHE_TTL    = 300;  // 快取秒數
 const LIVE_REFRESH = 60;   // live 場次自動刷新秒數
 // ────────────────────────────────────────────
+function parseTwemoji(el) {
+  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+}
 
 const WEEKDAYS = ['日','一','二','三','四','五','六'];
 
@@ -560,7 +561,7 @@ function renderMatches() {
     </div>
     ${matches.map(renderMatchCard).join('')}
   `;
-  if (typeof twemoji !== 'undefined') twemoji.parse(list, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+  parseTwemoji(list);
   notifyHeight();
 }
 
