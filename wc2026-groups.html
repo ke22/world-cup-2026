@@ -164,11 +164,19 @@ body {
 .cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
 
 @media (max-width: 767px) {
-  .anchor-nav { padding: 5px 12px; gap: 4px; }
-  .anchor-btn { height: 32px; font-size: 12px; padding: 0 8px; }
+  /* anchor nav 單排橫滑 */
+  .anchor-nav {
+    padding: 5px 12px;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .anchor-nav::-webkit-scrollbar { display: none; }
+  .anchor-btn { height: 32px; font-size: 12px; padding: 0 8px; flex-shrink: 0; }
   .group-section { scroll-margin-top: 42px; }
-  /* 手機版：固定頁高讓 groups-container 內部捲動 */
-  .page { height: 100svh; min-height: unset; }
+  /* 手機版：min-height 確保一組完整可見，內部滾軸 */
+  .page { min-height: 360px; height: 100svh; }
   .groups-container { min-height: 0; }
 }
 
