@@ -167,6 +167,9 @@ body {
   .anchor-nav { padding: 5px 12px; gap: 4px; }
   .anchor-btn { height: 32px; font-size: 12px; padding: 0 8px; }
   .group-section { scroll-margin-top: 42px; }
+  /* 手機版：固定頁高讓 groups-container 內部捲動 */
+  .page { height: 100svh; min-height: unset; }
+  .groups-container { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
