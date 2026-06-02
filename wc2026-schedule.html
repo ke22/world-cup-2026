@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
 <title>FIFA 世界杯 2026 賽程</title>
 <style>
 /* ── CNA Design System Variables ── */
@@ -271,6 +272,8 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .group-table .t-flag { font-size: 14px; }
 .group-table .t-name { font-size: 11px; font-weight: 600; color: var(--fg); }
 .group-table .pts-cell { font-weight: 800; color: var(--accent); }
+
+img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
@@ -557,6 +560,7 @@ function renderMatches() {
     </div>
     ${matches.map(renderMatchCard).join('')}
   `;
+  if (typeof twemoji !== 'undefined') twemoji.parse(list, { base: 'emoji/', folder: 'svg', ext: '.svg' });
   notifyHeight();
 }
 

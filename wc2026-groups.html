@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
 <title>FIFA 世界杯 2026 分組積分榜</title>
 <style>
 /* ── CNA Design System Variables ── */
@@ -182,6 +183,8 @@ body {
   .groups-container { min-height: 0; }
 }
 
+img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
@@ -341,6 +344,7 @@ async function init() {
   try {
     const groups = await fetchGroups();
     renderGroups(groups);
+    if (typeof twemoji !== 'undefined') twemoji.parse(document.getElementById('groups-container'), { base: 'emoji/', folder: 'svg', ext: '.svg' });
     notifyHeight();
   } catch (err) {
     document.getElementById('groups-container').innerHTML =
