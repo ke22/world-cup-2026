@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 <title>FIFA 世界杯 2026 賽程樹</title>
 <style>
 /* ── CNA Design System ── */
@@ -1161,7 +1160,6 @@ async function init() {
   const activePhase = getActivePhase(ko);
 
   document.getElementById('bracket-desktop').innerHTML = renderDesktop(ko);
-  if (typeof twemoji !== 'undefined') twemoji.parse(document.getElementById('bracket-desktop'), { folder: 'svg', ext: '.svg' });
   // Sync mobile nav button active states after render
   if (window.innerWidth < 660) syncMobileNavButtons();
   requestAnimationFrame(fitBracket);
