@@ -104,15 +104,57 @@ button:hover { background: #eef2f6; }
   </div>
 </div>
 
+<div class="embed-block">
+  <div class="embed-label">
+    ♿ wc2026-schedule-a11y.html (A11y 無障礙版)
+    <span class="height-badge" id="h-schedule-a11y">height: 300px</span>
+  </div>
+  <iframe id="frame-schedule-a11y" src="wc2026-schedule-a11y.html" title="賽程無障礙版"></iframe>
+  <div class="controls">
+    <button onclick="setWidth('frame-schedule-a11y', 375)">375px (Mobile)</button>
+    <button onclick="setWidth('frame-schedule-a11y', 900)">900px (PC)</button>
+    <button onclick="resetHeight('frame-schedule-a11y', 'h-schedule-a11y')">Reset 300px</button>
+  </div>
+</div>
+
+<div class="embed-block">
+  <div class="embed-label">
+    ♿ wc2026-groups-a11y.html (A11y 無障礙版)
+    <span class="height-badge" id="h-groups-a11y">height: 300px</span>
+  </div>
+  <iframe id="frame-groups-a11y" src="wc2026-groups-a11y.html" title="積分榜無障礙版"></iframe>
+  <div class="controls">
+    <button onclick="setWidth('frame-groups-a11y', 375)">375px (Mobile)</button>
+    <button onclick="setWidth('frame-groups-a11y', 900)">900px (PC)</button>
+    <button onclick="resetHeight('frame-groups-a11y', 'h-groups-a11y')">Reset 300px</button>
+  </div>
+</div>
+
+<div class="embed-block">
+  <div class="embed-label">
+    ♿ wc2026-bracket-a11y.html (A11y 無障礙版)
+    <span class="height-badge" id="h-bracket-a11y">height: 300px</span>
+  </div>
+  <iframe id="frame-bracket-a11y" src="wc2026-bracket-a11y.html" title="淘汰賽無障礙版"></iframe>
+  <div class="controls">
+    <button onclick="setWidth('frame-bracket-a11y', 375)">375px (Mobile)</button>
+    <button onclick="setWidth('frame-bracket-a11y', 900)">900px (PC)</button>
+    <button onclick="resetHeight('frame-bracket-a11y', 'h-bracket-a11y')">Reset 300px</button>
+  </div>
+</div>
+
 <div class="log-panel" id="log">
   <div class="log-entry"><span class="ts">--:--:--</span>等待 postMessage…</div>
 </div>
 
 <script>
 const frameMap = {
-  'frame-schedule': 'h-schedule',
-  'frame-groups':   'h-groups',
-  'frame-bracket':  'h-bracket',
+  'frame-schedule':       'h-schedule',
+  'frame-groups':         'h-groups',
+  'frame-bracket':        'h-bracket',
+  'frame-schedule-a11y':  'h-schedule-a11y',
+  'frame-groups-a11y':    'h-groups-a11y',
+  'frame-bracket-a11y':   'h-bracket-a11y',
 };
 
 window.addEventListener('message', e => {

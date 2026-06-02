@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
+<title>FIFA 世界杯 2026 賽程（無障礙版）</title>
+<style>
+/* ── A11y Design System — WCAG 2.1 AA / 長輩優化 ── */
+:root {
+  --bg:         #ffffff;
+  --surface:    #f5f5f5;
+  --surface-2:  #ebebeb;
+  --fg:         #1a1a1a;        /* contrast vs #fff: 16.7:1 AAA */
+  --muted:      #595959;        /* contrast vs #fff: 7.0:1 AA  */
+  --accent:     #0056b3;        /* contrast vs #fff: 7.2:1 AAA */
+  --accent-2:   #003d82;
+  --accent-soft:#e8f0fb;
+  --border:     #767676;        /* contrast vs #fff: 4.54:1 AA */
+  --shadow:     rgba(0,0,0,0.12);
+  --live:       #c0392b;        /* contrast vs #fff: 5.1:1 AA  */
+  --header-bg:  #003d82;        /* contrast vs #fff: 9.0:1 AAA */
+  --focus:      #0056b3;
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 18px; min-height: -webkit-fill-available; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 1rem;
+  line-height: 1.6;
+  min-height: -webkit-fill-available;
+}
+button { font-family: inherit; cursor: pointer; border: none; }
+
+/* ── Focus indicator ── */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Skip navigation ── */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  z-index: 10000;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+}
+.skip-link:focus { left: 0; outline: 3px solid #fff; outline-offset: -3px; }
+
+/* ── CNA Logo ── */
+.cna-logo { height: 28px; width: auto; filter: brightness(0) invert(1); opacity: 0.95; flex-shrink: 0; }
+.ver-tag { font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.75); letter-spacing: 0.3px; flex-shrink: 0; }
+
+/* ── Wrapper ── */
+.wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 14px 14px 0;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Main panel ── */
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  box-shadow: 0 4px 16px var(--shadow);
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── App container ── */
+#app { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ── Header ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px;
+  background: var(--header-bg);
+  gap: 12px;
+}
+.header-title {
+  font-size: 1.2rem; font-weight: 700; color: #fff;
+  line-height: 1.3;
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.header-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+
+/* ── Date nav ── */
+.date-nav {
+  display: flex; align-items: center;
+  padding: 8px 6px;
+  border-bottom: 2px solid var(--border);
+  background: var(--surface-2);
+  gap: 0;
+  overflow: hidden;
+}
+.nav-arrow {
+  background: none; border: 2px solid transparent;
+  font-size: 1.5rem; color: var(--accent); padding: 6px 8px;
+  flex-shrink: 0; line-height: 1; border-radius: 8px;
+  min-width: 48px; min-height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s;
+}
+.nav-arrow:hover { background: var(--accent-soft); }
+.date-tabs { display: flex; flex: 1; justify-content: space-around; overflow: hidden; }
+.date-tab {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 6px 4px; border-radius: 10px; border: 2px solid transparent; background: none;
+  flex: 1; min-width: 0; color: var(--muted);
+  min-height: 48px; justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+.date-tab:hover { background: var(--accent-soft); color: var(--fg); }
+.date-tab.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.date-tab .wd { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+.date-tab .dy { font-size: 1rem; font-weight: 400; }
+.date-tab.active .dy { font-weight: 800; }
+.date-tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 3px; }
+.date-tab .dot-placeholder { width: 7px; height: 7px; margin-top: 3px; }
+.date-tab .month-label { font-size: 0.67rem; font-weight: 700; color: var(--accent-2); min-height: 14px; line-height: 14px; }
+.date-nav-month { font-size: 0.83rem; font-weight: 700; color: var(--accent); flex-shrink: 0; padding: 0 6px; }
+
+/* ── Match list ── */
+.match-list {
+  padding: 14px 16px 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.day-header { padding: 4px 0 12px; }
+.day-header-title { font-size: 0.9rem; font-weight: 700; color: var(--muted); }
+
+/* ── Match card ── */
+.match-card {
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  background: var(--bg);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+.match-card.live {
+  background: #fff5f4;
+  border-color: var(--live);
+}
+
+.card-teams {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.team {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; min-width: 80px; max-width: 100px;
+}
+.team-flag { font-size: 2rem; line-height: 1; }
+.team-name {
+  font-size: 0.9rem; font-weight: 700; color: var(--fg);
+  text-align: center; line-height: 1.3;
+}
+
+.card-center {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; flex: 1; padding: 0 8px;
+}
+.score-finished { font-size: 2rem; font-weight: 800; color: var(--fg); letter-spacing: 4px; }
+.score-live     { font-size: 1.8rem; font-weight: 800; color: var(--live); letter-spacing: 4px; }
+.kickoff-time   { font-size: 1.8rem; font-weight: 400; color: var(--accent); }
+.live-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 800; color: var(--live); letter-spacing: 1px;
+  border: 2px solid var(--live); border-radius: 6px; padding: 2px 8px;
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--live);
+  animation: blink 1s ease-in-out infinite;
+}
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.15; } }
+
+.card-info {
+  margin-top: 12px; text-align: center;
+  font-size: 0.83rem; color: var(--muted); line-height: 1.6;
+  border-top: 1px solid var(--border); padding-top: 10px;
+}
+
+/* ── States ── */
+.state-msg {
+  text-align: center; padding: 48px 24px;
+  font-size: 1rem; color: var(--muted);
+}
+.state-error { color: var(--live); font-weight: 600; }
+.state-error small { display: block; margin-top: 8px; font-size: 0.83rem; color: var(--muted); font-weight: 400; }
+
+img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
+
+@media (prefers-contrast: more) {
+  :root { --border: #000000; --muted: #000000; }
+  .match-card, .panel { border-width: 2px; border-color: #000; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">跳至主要內容</a>
+
+<div class="wrapper">
+  <div class="panel" id="app"></div>
+</div>
+
+<script>
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
+const CACHE_TTL    = 300;
+const LIVE_REFRESH = 60;
+
+function parseTwemoji(el) {
+  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+}
+
+const WEEKDAYS = ['日','一','二','三','四','五','六'];
+
+let allMatches  = [];
+let windowStart = null;
+let activeDate  = '';
+let liveTimer   = null;
+
+function toYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function parseYMD(str) {
+  const [y, mo, d] = str.split('-').map(Number);
+  return new Date(y, mo - 1, d);
+}
+
+function formatDateLabel(ymd) {
+  const d   = parseYMD(ymd);
+  const m   = d.getMonth() + 1;
+  const day = d.getDate();
+  const wd  = WEEKDAYS[d.getDay()];
+  return `${m}月${day}日（${wd}）`;
+}
+
+function cacheGet(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts < CACHE_TTL * 1000) return data;
+    sessionStorage.removeItem(key);
+    return null;
+  } catch { return null; }
+}
+
+function cacheSet(key, data) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
+async function apiFetch(params) {
+  const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.status === 'error') throw new Error(json.message || 'API error');
+  return json.data;
+}
+
+async function fetchAllMatches(bypassCache) {
+  const key = 'wc26_all_a11y';
+  if (!bypassCache) {
+    const hit = cacheGet(key);
+    if (hit) return hit;
+  }
+  const data = await apiFetch({ action: 'getMatches' });
+  cacheSet(key, data);
+  return data;
+}
+
+function getMatchDateSet() {
+  return new Set(allMatches.map(m => m.date));
+}
+
+function findInitialDate() {
+  const today = toYMD(new Date());
+  const dates = [...getMatchDateSet()].sort();
+  if (!dates.length) return today;
+  if (dates.includes(today)) return today;
+  const future = dates.find(d => d >= today);
+  return future || dates[0];
+}
+
+function setWindowForDate(ymd) {
+  const d   = parseYMD(ymd);
+  const dow = d.getDay();
+  const toMon = dow === 0 ? -6 : 1 - dow;
+  windowStart = addDays(d, toMon);
+}
+
+function hasLiveOnActiveDate() {
+  return allMatches.some(m => m.date === activeDate && m.status === 'live');
+}
+
+function startLiveRefresh() {
+  stopLiveRefresh();
+  if (!hasLiveOnActiveDate()) return;
+  liveTimer = setInterval(async () => {
+    try {
+      allMatches = await fetchAllMatches(true);
+      renderMatches();
+      notifyHeight();
+      if (!hasLiveOnActiveDate()) stopLiveRefresh();
+    } catch {}
+  }, LIVE_REFRESH * 1000);
+}
+
+function stopLiveRefresh() {
+  if (liveTimer !== null) { clearInterval(liveTimer); liveTimer = null; }
+}
+
+function renderShell() {
+  document.getElementById('app').innerHTML = `
+    <header class="header">
+      <h1 class="header-title">⚽ FIFA 世界杯 2026 賽程</h1>
+      <div class="header-actions">
+        <span class="ver-tag">v1.1-a11y</span>
+        <img src="cna_logo.svg" class="cna-logo" alt="CNA 中央通訊社">
+      </div>
+    </header>
+    <nav class="date-nav" id="date-nav" aria-label="日期導覽"></nav>
+    <main id="main-content">
+      <section id="match-list-section"
+               aria-label="今日賽事"
+               aria-live="polite"
+               aria-atomic="false">
+        <div class="match-list" id="match-list"></div>
+      </section>
+    </main>
+  `;
+}
+
+function renderDateNav() {
+  const nav = document.getElementById('date-nav');
+  if (!nav) return;
+  const matchDates = getMatchDateSet();
+
+  const tabs = Array.from({ length: 7 }, (_, i) => {
+    const d        = addDays(windowStart, i);
+    const ymd      = toYMD(d);
+    const wd       = WEEKDAYS[d.getDay()];
+    const dayNum   = d.getDate();
+    const month    = d.getMonth() + 1;
+    const hasMatch = matchDates.has(ymd);
+    const isActive = ymd === activeDate;
+    return { ymd, wd, dayNum, month, hasMatch, isActive };
+  });
+
+  const uniqueMonths = [...new Set(tabs.map(t => t.month))];
+  const isCrossMonth = uniqueMonths.length > 1;
+  const showMonthAt = new Set();
+  if (isCrossMonth) {
+    let prev = tabs[0].month;
+    for (let i = 1; i < tabs.length; i++) {
+      if (tabs[i].month !== prev) { showMonthAt.add(i); prev = tabs[i].month; }
+    }
+  }
+
+  const singleMonthHtml = !isCrossMonth
+    ? `<span class="date-nav-month" aria-hidden="true">${tabs[0].month}月</span>`
+    : '';
+
+  nav.innerHTML = `
+    <button class="nav-arrow" id="nav-prev" aria-label="前一週，顯示更早的比賽">&#8249;</button>
+    ${singleMonthHtml}
+    <div class="date-tabs" role="tablist" aria-label="選擇日期">
+      ${tabs.map(({ ymd, wd, dayNum, month, hasMatch, isActive }, i) => `
+        <button class="date-tab${isActive ? ' active' : ''}"
+                data-date="${ymd}"
+                role="tab"
+                aria-selected="${isActive}"
+                aria-label="${month}月${dayNum}日 星期${wd}${hasMatch ? '，有比賽' : '，無比賽'}">
+          <span class="month-label" aria-hidden="true">${showMonthAt.has(i) ? `${month}月` : ''}</span>
+          <span class="wd" aria-hidden="true">${wd}</span>
+          <span class="dy" aria-hidden="true">${dayNum}</span>
+          ${hasMatch ? '<span class="dot" aria-hidden="true"></span>' : '<span class="dot-placeholder" aria-hidden="true"></span>'}
+        </button>
+      `).join('')}
+    </div>
+    <button class="nav-arrow" id="nav-next" aria-label="後一週，顯示更晚的比賽">&#8250;</button>
+  `;
+
+  nav.querySelectorAll('.date-tab').forEach(btn =>
+    btn.addEventListener('click', () => selectDate(btn.dataset.date))
+  );
+  document.getElementById('nav-prev').addEventListener('click', () => shiftWindow(-7));
+  document.getElementById('nav-next').addEventListener('click', () => shiftWindow(7));
+
+  const activeTab = nav.querySelector('.date-tab.active');
+  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+function renderMatches() {
+  const list = document.getElementById('match-list');
+  if (!list) return;
+  const matches = allMatches.filter(m => m.date === activeDate);
+
+  if (!matches.length) {
+    list.innerHTML = '<p class="state-msg">本日無賽事</p>';
+    notifyHeight();
+    return;
+  }
+
+  const d = parseYMD(activeDate);
+  list.innerHTML = `
+    <div class="day-header">
+      <p class="day-header-title">${formatDateLabel(activeDate)} ${d.getFullYear()}</p>
+    </div>
+    ${matches.map(renderMatchCard).join('')}
+  `;
+  parseTwemoji(list);
+  notifyHeight();
+}
+
+function renderMatchCard(m) {
+  const t1name = m.team1.name || m.team1.code || '待定';
+  const t2name = m.team2.name || m.team2.code || '待定';
+  let centerHtml = '';
+  let cardClass  = 'match-card';
+  let scoreAria  = '';
+
+  if (m.status === 'finished') {
+    centerHtml = `<div class="score-finished" aria-label="比分 ${m.score1} 比 ${m.score2}">${m.score1}&thinsp;:&thinsp;${m.score2}</div>`;
+    scoreAria  = `${t1name} ${m.score1} 比 ${m.score2} ${t2name}，已結束`;
+  } else if (m.status === 'live') {
+    cardClass += ' live';
+    centerHtml = `
+      <div class="live-badge"><span class="live-dot" aria-hidden="true"></span>直播中</div>
+      <div class="score-live" aria-label="目前比分 ${m.score1} 比 ${m.score2}">${m.score1}&thinsp;:&thinsp;${m.score2}</div>
+    `;
+    scoreAria = `直播中：${t1name} ${m.score1} 比 ${m.score2} ${t2name}`;
+  } else {
+    centerHtml = `<div class="kickoff-time" aria-label="開賽時間 ${m.time_utc8}">${m.time_utc8}</div>`;
+    scoreAria  = `${t1name} 對 ${t2name}，開賽時間 ${m.time_utc8}`;
+  }
+
+  const parts = [];
+  if (m.round > 0) {
+    parts.push(`第${m.round}輪`);
+    if (m.group) parts.push(`${m.group}組`);
+  } else if (m.phase) {
+    parts.push(m.phase);
+  }
+  if (m.venue) parts.push(m.venue);
+  if (m.city)  parts.push(m.city);
+  const infoLine = parts.join(' · ');
+
+  return `
+    <article class="${cardClass}" aria-label="${scoreAria}">
+      <div class="card-teams" aria-hidden="true">
+        <div class="team">
+          <span class="team-flag">${m.team1.flag}</span>
+          <span class="team-name">${t1name}</span>
+        </div>
+        <div class="card-center">${centerHtml}</div>
+        <div class="team">
+          <span class="team-flag">${m.team2.flag}</span>
+          <span class="team-name">${t2name}</span>
+        </div>
+      </div>
+      ${infoLine ? `<p class="card-info">${infoLine}</p>` : ''}
+    </article>
+  `;
+}
+
+function shiftWindow(days) {
+  windowStart = addDays(windowStart, days);
+  renderDateNav();
+  notifyHeight();
+}
+
+function selectDate(ymd) {
+  activeDate = ymd;
+  renderDateNav();
+  renderMatches();
+  startLiveRefresh();
+  notifyHeight();
+}
+
+function notifyHeight() {
+  try {
+    window.parent.postMessage(
+      { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
+      '*'
+    );
+  } catch {}
+}
+
+async function init() {
+  const app = document.getElementById('app');
+
+  if (!GAS_URL) {
+    app.innerHTML = `<div role="status" class="state-msg state-error">資料來源未設定<small>請確認 GAS_URL 已設定</small></div>`;
+    notifyHeight();
+    return;
+  }
+
+  app.innerHTML = '<div role="status" class="state-msg">載入賽程資料中⋯</div>';
+  notifyHeight();
+
+  try {
+    allMatches = await fetchAllMatches(false);
+  } catch {
+    app.innerHTML = '<div role="status" class="state-msg state-error">資料載入失敗，請稍後重試</div>';
+    notifyHeight();
+    return;
+  }
+
+  activeDate = findInitialDate();
+  setWindowForDate(activeDate);
+  renderShell();
+  renderDateNav();
+  renderMatches();
+  startLiveRefresh();
+  notifyHeight();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
