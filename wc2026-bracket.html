@@ -28,7 +28,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 18px; min-height: -webkit-fill-available; }
+html { font-size: 20px; min-height: -webkit-fill-available; }
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
@@ -66,7 +66,7 @@ body {
 .state-msg { text-align: center; padding: 40px 20px; font-size: 1rem; color: var(--muted); }
 .state-error { color: #c0392b; }
 
-.bracket-desktop { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.bracket-desktop { display: flex; flex-direction: column; }
 .bracket-mobile  { display: none; }
 
 /* ── Mobile: center nav fills remaining space (≤659px) ── */
@@ -109,9 +109,10 @@ body {
   .round-col.collapsed { display: none; }
 }
 
-/* Outer centering wrapper — fills remaining height */
+/* Outer centering wrapper — bracket needs fixed height to scale/fit */
 .bracket-outer-wrap {
-  flex: 1;
+  height: calc(100svh - 120px);
+  min-height: 400px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -126,7 +127,6 @@ body {
   border-radius: 0 0 16px 16px;
   box-shadow: 0 10px 30px var(--shadow);
   overflow: hidden;
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -147,15 +147,18 @@ body {
 /* ── Col grip (thin edge strip to trigger collapse) ── */
 .col-grip {
   flex-shrink: 0;
-  width: 8px;
+  width: 20px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  background: transparent;
-  color: transparent;
-  font-size: 7px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10px;
+  border-left: 1px solid var(--border);
   transition: background 0.15s, color 0.15s;
   user-select: none;
 }
+.col-grip::after { content: '‹'; font-size: 14px; font-weight: 700; line-height: 1; }
+.bracket-right .col-grip::after { content: '›'; }
 .col-grip:hover { background: var(--accent-soft); color: var(--accent); }
 .round-col.collapsed .col-grip { display: none; }
 /* Right bracket: grip on left side (mirror) */
@@ -234,33 +237,46 @@ body {
 
 /* ── Collapsed column ── */
 .round-col.collapsed {
-  width: 26px !important;
-  flex: 0 0 26px !important;
+  width: 36px !important;
+  flex: 0 0 36px !important;
   cursor: pointer;
-  background: var(--surface-2);
+  background: var(--accent-soft);
+  border-right: 2px solid var(--accent-2);
   overflow: hidden;
   justify-content: center;
   align-items: center;
   padding-top: 0;
-  transition: width 0.2s ease;
+  transition: width 0.2s ease, background 0.15s;
 }
+.round-col.collapsed:hover { background: rgba(15,75,143,0.15); }
 .round-col.collapsed .col-content-wrap { display: none; }
 .round-col .col-dots {
   display: none;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   user-select: none;
+  gap: 6px;
 }
 .round-col.collapsed .col-dots { display: flex; flex: 1; align-items: center; justify-content: center; }
 .col-dots-ellipsis {
-  font-size: 10px; font-weight: 700; color: var(--accent);
+  font-size: 11px; font-weight: 800; color: var(--accent);
   writing-mode: vertical-rl;
   text-orientation: mixed;
   letter-spacing: 1px;
 }
 .col-dots-ellipsis .tcy {
   text-combine-upright: all;
+}
+/* Expand icon on collapsed column */
+.round-col.collapsed .col-dots::before {
+  content: '›';
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 4px;
 }
 
 /* ── Match pair ── */
@@ -423,11 +439,12 @@ body {
 .center-nav { display: none; }
 .cnav-btn {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; padding: 5px 6px;
-  font-size: 10px; font-weight: 700; color: var(--accent);
+  border-radius: 6px; padding: 6px 8px;
+  font-size: 0.6rem; font-weight: 700; color: var(--accent);
   cursor: pointer; font-family: inherit;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
   white-space: nowrap;
+  min-height: 36px;
 }
 .cnav-btn:hover { background: var(--accent-soft); }
 .cnav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
