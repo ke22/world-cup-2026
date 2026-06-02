@@ -118,6 +118,7 @@ body {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(15, 75, 143, 0.04);
 }
+.group-table-wrap { overflow-x: auto; }
 .group-card-title {
   background: var(--surface-2);
   padding: 10px 14px;
@@ -127,25 +128,26 @@ body {
 }
 
 /* ── Group table ── */
-.group-table { width: 100%; border-collapse: collapse; }
+.group-table { width: 100%; border-collapse: collapse; min-width: 360px; }
 .group-table th {
-  font-size: 0.78rem; font-weight: 700; color: var(--muted);
-  text-align: center; padding: 8px 4px;
+  font-size: 0.72rem; font-weight: 700; color: var(--muted);
+  text-align: center; padding: 6px 4px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
-.group-table th.th-team { text-align: left; padding-left: 12px; }
+.group-table th.th-team { text-align: left; padding-left: 10px; }
 .group-table td {
-  font-size: 1rem; text-align: center; padding: 10px 4px;
+  font-size: 0.9rem; text-align: center; padding: 8px 4px;
   border-top: 1px solid rgba(15, 50, 96, 0.06);
 }
-.group-table td.td-team { text-align: left; padding-left: 12px; }
+.group-table td.td-team { text-align: left; padding-left: 10px; }
 .group-table tbody tr:hover td { background: var(--accent-soft); }
 
 /* ── Team cell ── */
-.team-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.t-flag { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
-.t-name { font-size: 1rem; font-weight: 700; color: var(--fg); }
+.team-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.t-flag { font-size: 1rem; line-height: 1; flex-shrink: 0; }
+.t-name { font-size: 0.9rem; font-weight: 700; color: var(--fg); }
 
 /* ── Stats cells ── */
 .rank-cell { color: var(--muted); font-size: 0.83rem; font-weight: 600; }
@@ -306,7 +308,7 @@ function renderGroups(groups) {
       <section class="group-section" id="group-${g}">
         <div class="group-card">
           <div class="group-card-title">${g} 組</div>
-          <table class="group-table" aria-label="${g} 組積分">
+          <div class="group-table-wrap"><table class="group-table" aria-label="${g} 組積分">
             <thead>
               <tr>
                 <th>#</th>
@@ -320,7 +322,7 @@ function renderGroups(groups) {
               </tr>
             </thead>
             <tbody>${rows}</tbody>
-          </table>
+          </table></div>
         </div>
       </section>
     `;
