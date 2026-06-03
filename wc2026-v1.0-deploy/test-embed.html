@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNA Embed Test — wc2026 charts</title>
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 20px;
+  color: #1f2937;
+}
+h1 { font-size: 18px; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #66758a; margin-bottom: 24px; }
+.embed-block {
+  background: #fff;
+  border: 1px solid #dde3ec;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.embed-label {
+  font-size: 13px; font-weight: 700; color: #0f4b8f;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+}
+.embed-label .height-badge {
+  font-size: 11px; font-weight: 400; color: #66758a;
+  background: #eef2f6; padding: 2px 8px; border-radius: 20px;
+}
+iframe {
+  display: block;
+  width: 375px;
+  height: 300px;
+  border: 2px dashed #c9d6e3;
+  border-radius: 8px;
+  transition: height 0.3s ease;
+}
+iframe.pc { width: 900px; }
+.controls {
+  margin-top: 8px;
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+button {
+  font-size: 12px; padding: 4px 10px;
+  border: 1px solid #c9d6e3; border-radius: 6px;
+  background: #fff; cursor: pointer; color: #0f4b8f;
+}
+button:hover { background: #eef2f6; }
+.log-panel {
+  background: #1e2a38; border-radius: 8px; padding: 12px;
+  margin-top: 20px; max-height: 200px; overflow-y: auto;
+  font-family: monospace; font-size: 12px; color: #a8c4e0;
+}
+.log-entry { margin-bottom: 4px; }
+.log-entry .ts { color: #66a0c8; margin-right: 6px; }
+.log-entry .source { color: #f0b429; margin-right: 6px; }
+.log-entry .height { color: #6ee7b7; }
+</style>
+</head>
+<body>
+
+<h1>CNA Embed Test — World Cup 2026 Charts</h1>
+<p class="subtitle">監聽 <code>wc2026-resize</code> postMessage 並動態調整 iframe 高度。初始高度 300px，收到訊息後自動撐開。</p>
+
+<div class="embed-block">
+  <div class="embed-label">
+    📅 wc2026-schedule.html (Mobile 375px)
+    <span class="height-badge" id="h-schedule">height: 300px</span>
+  </div>
+  <iframe id="frame-schedule" src="wc2026-schedule.html" title="賽程"></iframe>
+  <div class="controls">
+    <button onclick="setWidth('frame-schedule', 375)">375px (Mobile)</button>
+    <button onclick="setWidth('frame-schedule', 900)" class="pc">900px (PC)</button>
+    <button onclick="resetHeight('frame-schedule', 'h-schedule')">Reset 300px</button>
+  </div>
+</div>
+
+<div class="embed-block">
+  <div class="embed-label">
+    🏆 wc2026-groups.html (Mobile 375px)
+    <span class="height-badge" id="h-groups">height: 300px</span>
+  </div>
+  <iframe id="frame-groups" src="wc2026-groups.html" title="積分榜"></iframe>
+  <div class="controls">
+    <button onclick="setWidth('frame-groups', 375)">375px (Mobile)</button>
+    <button onclick="setWidth('frame-groups', 900)">900px (PC)</button>
+    <button onclick="resetHeight('frame-groups', 'h-groups')">Reset 300px</button>
+  </div>
+</div>
+
+<div class="embed-block">
+  <div class="embed-label">
+    🌳 wc2026-bracket.html (Mobile 375px)
+    <span class="height-badge" id="h-bracket">height: 300px</span>
+  </div>
+  <iframe id="frame-bracket" src="wc2026-bracket.html" title="賽程樹"></iframe>
+  <div class="controls">
+    <button onclick="setWidth('frame-bracket', 375)">375px (Mobile)</button>
+    <button onclick="setWidth('frame-bracket', 900)">900px (PC)</button>
+    <button onclick="resetHeight('frame-bracket', 'h-bracket')">Reset 300px</button>
+  </div>
+</div>
+
+
+<div class="log-panel" id="log">
+  <div class="log-entry"><span class="ts">--:--:--</span>等待 postMessage…</div>
+</div>
+
+<script>
+const frameMap = {
+  'frame-schedule': 'h-schedule',
+  'frame-groups':   'h-groups',
+  'frame-bracket':  'h-bracket',
+};
+
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'wc2026-resize') return;
+
+  const height = e.data.height;
+  const source = e.source;
+
+  // Find which iframe sent the message
+  let frameId = null;
+  for (const [id] of Object.entries(frameMap)) {
+    const frame = document.getElementById(id);
+    if (frame && frame.contentWindow === source) {
+      frameId = id;
+      break;
+    }
+  }
+
+  if (frameId) {
+    const frame = document.getElementById(frameId);
+    const badgeId = frameMap[frameId];
+    frame.style.height = height + 'px';
+    document.getElementById(badgeId).textContent = `height: ${height}px`;
+  }
+
+  // Log
+  const log = document.getElementById('log');
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);
+  const sourceName = frameId || 'unknown';
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="ts">${ts}</span><span class="source">${sourceName}</span><span class="height">height: ${height}px</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+});
+
+function setWidth(frameId, px) {
+  const frame = document.getElementById(frameId);
+  frame.style.width = px + 'px';
+}
+
+function resetHeight(frameId, badgeId) {
+  const frame = document.getElementById(frameId);
+  frame.style.height = '300px';
+  document.getElementById(badgeId).textContent = 'height: 300px';
+}
+</script>
+</body>
+</html>

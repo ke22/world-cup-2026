@@ -1,13 +1,35 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Date navigation with 7-day sliding window
 
-The dashboard SHALL display a horizontal date navigation bar showing exactly 7 consecutive dates at a time. The active date SHALL be highlighted. Dates that have at least one match SHALL display a visual indicator (blue dot). The user SHALL be able to navigate forward and backward in 7-day increments using arrow controls.
+The dashboard SHALL display a horizontal date navigation bar showing exactly 7 consecutive dates at a time. The active date SHALL be highlighted. Dates that have at least one match SHALL display a visual indicator (blue dot). The user SHALL be able to navigate forward and backward in 7-day increments using arrow controls. When the 7-day window spans two calendar months, the navigation bar SHALL display a month label for the first date of each new month visible in the window. When all 7 dates are within the same month, the current month name SHALL be displayed at the left side of the navigation bar.
 
 #### Scenario: Initial load navigates to today
 
 - **WHEN** the page is opened
 - **THEN** the date navigation SHALL focus on today's date if today has matches, otherwise on the nearest future date that has matches
+- **THEN** the active date tab SHALL be scrolled into the center of the visible navigation bar
+
+#### Scenario: Active tab auto-centered on load
+
+- **WHEN** the page finishes loading and the initial date is determined
+- **THEN** the date tabs container SHALL call scrollIntoView on the active tab with inline: "center" and behavior: "smooth"
+
+#### Scenario: Month label shown when window spans two months
+
+- **WHEN** the 7-day window contains dates from two different calendar months (e.g., Jun 30 and Jul 1)
+- **THEN** the first date of the new month (Jul 1) SHALL display a month label ("七月") above or within its tab
+
+##### Example: Cross-month window
+
+- **GIVEN** window showing Jun 30, Jul 1, Jul 2, Jul 3, Jul 4, Jul 5, Jul 6
+- **THEN** Jul 1 tab SHALL display "七月" month label
+- **THEN** Jun 30 tab SHALL NOT display a month label (it is the previous month already established)
+
+#### Scenario: Single-month window shows month at nav bar left
+
+- **WHEN** all 7 dates in the window are in the same calendar month (e.g., all in July)
+- **THEN** the navigation bar left area SHALL display the month name (e.g., "七月")
 
 #### Scenario: Navigate to previous week
 
@@ -27,12 +49,13 @@ The dashboard SHALL display a horizontal date navigation bar showing exactly 7 c
 ##### Example: Group stage week
 
 - **GIVEN** dates Jun 11 (2 matches), Jun 12 (4 matches), Jun 13 (0 matches)
-- **WHEN** the navigation window includes Jun 11–17
+- **WHEN** the navigation window includes Jun 11-17
 - **THEN** Jun 11 and Jun 12 show blue dots; Jun 13 does not
 
 ### Requirement: Match card rendering by status
 
 Each match SHALL be rendered as a card. The center of the card SHALL display different content based on the match status:
+
 - `upcoming`: Taiwan local time (UTC+8) in HH:MM format
 - `live`: current score as `score1 : score2` with an animated red dot indicator and orange-red background
 - `finished`: final score as `score1 : score2` in bold large font with dark color
@@ -60,11 +83,11 @@ The card SHALL also display: team codes, team flag emoji, round info, group (if 
 
 ##### Example: Status-to-display mapping
 
-| status     | score1 | score2 | Center display | Background |
-|------------|--------|--------|----------------|------------|
-| upcoming   | null   | null   | `22:00`        | white      |
-| live       | 1      | 0      | `1 : 0`        | orange-red |
-| finished   | 3      | 1      | `3 : 1`        | white      |
+| status | score1 | score2 | Center display | Background |
+|--------|--------|--------|----------------|------------|
+| upcoming | null | null | `22:00` | white |
+| live | 1 | 0 | `1 : 0` | orange-red |
+| finished | 3 | 1 | `3 : 1` | white |
 
 ### Requirement: Date change triggers data fetch
 
@@ -117,44 +140,7 @@ After the user selects a date in the date navigation bar and the match list re-r
 ##### Example: height change on tab switch
 
 | Date selected | Match count | Expected notifyHeight call |
-|---------------|-------------|---------------------------|
-| Jun 12 (4 matches) | 4 | Once, after 4 match cards render |
-| Jun 13 (0 matches) | 0 | Once, after empty-state renders |
-| Jun 18 (2 matches) | 2 | Once, after 2 match cards render |
-
-## Requirements
-
-
-<!-- @trace
-source: wc2026-chart-ux-fix
-updated: 2026-06-01
-code:
-  - wc2026-schedule.html
-  - .antigravitycli/5dd1ba32-5d02-465a-b397-faa5c2e3c80b.json
-  - .DS_Store
-  - wc2026-groups.html
-  - wc2026-bracket.html
-  - test-embed.html
--->
-
-### Requirement: Height notification on date tab switch
-
-After the user selects a date in the date navigation bar and the match list re-renders, the schedule page SHALL call `notifyHeight()` to report the updated `scrollHeight` to the parent frame. The notification SHALL be sent after the DOM update from the tab switch is complete.
-
-#### Scenario: Tab switch triggers height notification
-
-- **WHEN** the user clicks a date tab in the navigation bar
-- **THEN** the match list for that date SHALL render AND `notifyHeight()` SHALL be called once after rendering completes
-
-#### Scenario: Empty date tab triggers height notification
-
-- **WHEN** the user clicks a date tab that has no matches
-- **THEN** the empty-state UI SHALL render AND `notifyHeight()` SHALL be called with the reduced content height
-
-##### Example: height change on tab switch
-
-| Date selected | Match count | Expected notifyHeight call |
-|---------------|-------------|---------------------------|
+|---------------|-------------|----------------------------|
 | Jun 12 (4 matches) | 4 | Once, after 4 match cards render |
 | Jun 13 (0 matches) | 0 | Once, after empty-state renders |
 | Jun 18 (2 matches) | 2 | Once, after 2 match cards render |
