@@ -232,7 +232,7 @@ body {
   min-width: 0;
 }
 .gb-flag { font-size: 0.75rem; flex-shrink: 0; line-height: 1; }
-.gb-name { font-size: 0.58rem; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.gb-name { font-size: 0.55rem; font-weight: 600; color: var(--fg); min-width: 0; line-height: 1.3; word-break: break-all; }
 
 /* ── Round column ── */
 .round-col {
@@ -819,7 +819,7 @@ function renderDesktop(matches) {
 
   const COL_W = 92;   // R32/R16/QF/SF columns
   const FIN_W = 82;   // Final columns (one team each side)
-  const GRP_W = 80;
+  const GRP_W = 100;
   const CEN_W = 76;   // Trophy only
   const COL_C = 26;
 
