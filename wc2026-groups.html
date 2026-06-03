@@ -178,6 +178,12 @@ body {
   .anchor-nav::-webkit-scrollbar { display: none; }
   .anchor-btn { height: 36px; font-size: 0.78rem; padding: 0 10px; flex-shrink: 0; }
   .group-section { scroll-margin-top: 52px; }
+  /* 手機：container 高度剛好顯示一組，超出往下捲 */
+  .groups-container {
+    max-height: 220px;
+    overflow-y: auto;
+    min-height: unset;
+  }
 }
 
 img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
