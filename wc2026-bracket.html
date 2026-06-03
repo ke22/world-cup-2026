@@ -232,7 +232,7 @@ body {
   min-width: 0;
 }
 .gb-flag { font-size: 0.75rem; flex-shrink: 0; line-height: 1; }
-.gb-name { font-size: 0.55rem; font-weight: 600; color: var(--fg); min-width: 0; line-height: 1.25; white-space: normal; }
+.gb-name { font-size: 0.55rem; font-weight: 600; color: var(--fg); min-width: 0; white-space: nowrap; overflow: hidden; }
 
 /* ── Round column ── */
 .round-col {
@@ -795,8 +795,8 @@ function groupBox(letter, sz) {
     </div>`;
   }
   const rows = g.teams.map(([flag, name]) => {
-    const style = name.length > 4 ? ' style="font-size:0.45rem"' : '';
-    return `<div class="gb-row"><span class="gb-flag">${flag}</span><span class="gb-name"${style}>${name}</span></div>`;
+    const display = name.length > 4 ? name.slice(0, 4) + '…' : name;
+    return `<div class="gb-row"><span class="gb-flag">${flag}</span><span class="gb-name" title="${name}">${display}</span></div>`;
   }).join('');
   return `<div class="group-box" style="--gc:${g.color}">
     <div class="group-name">${letter}</div>
