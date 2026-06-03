@@ -287,15 +287,15 @@ footer {
 
 <script>
 const CHARTS = [
-  { id: 'schedule', file: 'wc2026-schedule.html', iframeId: 'cna-wc2026-schedule' },
-  { id: 'groups',   file: 'wc2026-groups.html',   iframeId: 'cna-wc2026-groups'   },
-  { id: 'bracket',  file: 'wc2026-bracket.html',  iframeId: 'cna-wc2026-bracket'  },
+  { id: 'schedule', file: 'wc2026-schedule.html', iframeId: 'cna-wc2026-schedule', height: 847 },
+  { id: 'groups',   file: 'wc2026-groups.html',   iframeId: 'cna-wc2026-groups',   height: 460 },
+  { id: 'bracket',  file: 'wc2026-bracket.html',  iframeId: 'cna-wc2026-bracket',  height: 460 },
 ];
 
 const A11Y_CHARTS = [
-  { id: 'schedule-a11y', file: 'wc2026-schedule-a11y.html', iframeId: 'cna-wc2026-schedule-a11y' },
-  { id: 'groups-a11y',   file: 'wc2026-groups-a11y.html',   iframeId: 'cna-wc2026-groups-a11y'   },
-  { id: 'bracket-a11y',  file: 'wc2026-bracket-a11y.html',  iframeId: 'cna-wc2026-bracket-a11y'  },
+  { id: 'schedule-a11y', file: 'wc2026-schedule-a11y.html', iframeId: 'cna-wc2026-schedule-a11y', height: 847 },
+  { id: 'groups-a11y',   file: 'wc2026-groups-a11y.html',   iframeId: 'cna-wc2026-groups-a11y',   height: 460 },
+  { id: 'bracket-a11y',  file: 'wc2026-bracket-a11y.html',  iframeId: 'cna-wc2026-bracket-a11y',  height: 460 },
 ];
 
 function buildCode(baseUrl, chart) {
@@ -304,7 +304,7 @@ function buildCode(baseUrl, chart) {
     id="${chart.iframeId}"
     src="${baseUrl}/${chart.file}"
     width="100%"
-    height="460"
+    height="${chart.height}"
     frameborder="0"
     scrolling="no"
     style="border:none;display:block;"

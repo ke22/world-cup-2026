@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
-<title>FIFA 世界杯 2026 分組積分榜</title>
+<title>世界盃小組積分</title>
 <style>
 /* ── CNA Design System Variables ── */
 :root {
@@ -76,7 +76,9 @@ body {
   box-shadow: 0 2px 8px var(--shadow);
 }
 .anchor-btn {
-  height: 44px; padding: 0 12px;
+  height: 44px;
+  padding: 0 12px;
+  flex: 1 1 0;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -117,7 +119,7 @@ body {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(15, 75, 143, 0.04);
 }
-.group-table-wrap { overflow-x: auto; }
+.group-table-wrap { overflow-x: hidden; }
 .group-card-title {
   background: var(--surface-2);
   padding: 10px 14px;
@@ -127,7 +129,7 @@ body {
 }
 
 /* ── Group table ── */
-.group-table { width: 100%; border-collapse: collapse; min-width: 360px; }
+.group-table { width: 100%; border-collapse: collapse; }
 .group-table th {
   font-size: 0.72rem; font-weight: 700; color: var(--muted);
   text-align: center; padding: 6px 4px;
@@ -167,16 +169,20 @@ body {
 .ver-tag { font-size: 0.67rem; font-weight: 600; color: rgba(255,255,255,0.5); letter-spacing: 0.3px; flex-shrink: 0; }
 
 @media (max-width: 767px) {
-  /* anchor nav 單排橫滑 */
+  /* anchor nav 單排等分 */
   .anchor-nav {
     padding: 5px 12px;
     gap: 4px;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
+    overflow-x: hidden;
   }
-  .anchor-nav::-webkit-scrollbar { display: none; }
-  .anchor-btn { height: 36px; font-size: 0.78rem; padding: 0 10px; flex-shrink: 0; }
+  .anchor-btn {
+    height: 36px;
+    font-size: 0.78rem;
+    padding: 0 4px;
+    flex: 1 1 0;
+    min-width: 0;
+  }
   .group-section { scroll-margin-top: 52px; }
   /* 手機：container 高度剛好顯示一組，超出往下捲 */
   .groups-container {
@@ -197,8 +203,7 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 
 <div class="page">
   <header class="page-header">
-    <span class="page-header-title">⚽ FIFA 世界杯 2026 分組積分榜</span>
-    <span class="ver-tag">v1.1</span>
+    <span class="page-header-title">世界盃小組積分</span>
     <img src="cna_logo.svg" class="cna-logo" alt="CNA">
   </header>
 
@@ -297,7 +302,7 @@ function renderGroups(groups) {
           <td class="td-team">
             <div class="team-cell">
               <span class="t-flag">${t.team.flag}</span>
-              <span class="t-name">${t.team.name || t.team.code}</span>
+              <span class="t-name" title="${t.team.name || t.team.code}">${(t.team.name || t.team.code).length > 4 ? (t.team.name || t.team.code).slice(0,4)+'…' : (t.team.name || t.team.code)}</span>
             </div>
           </td>
           <td>${t.played}</td>

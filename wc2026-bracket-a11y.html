@@ -148,7 +148,9 @@ body {
 }
 .score-finished { font-size: 2rem; font-weight: 800; color: var(--fg); letter-spacing: 4px; }
 .score-live     { font-size: 1.8rem; font-weight: 800; color: var(--live); letter-spacing: 4px; }
-.kickoff-time   { font-size: 1.6rem; font-weight: 400; color: var(--accent); }
+.kickoff-time   { font-size: 1.6rem; font-weight: 400; color: var(--accent); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.kt-ampm        { font-size: 0.6em; font-weight: 500; }
+.tz-note        { font-size: 0.58rem; font-weight: 400; color: var(--muted); letter-spacing: 0.3px; }
 .live-badge {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.78rem; font-weight: 800; color: var(--live);
@@ -206,6 +208,15 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 <script>
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
 const CACHE_TTL = 300;
+
+function fmtTime(hhmm) {
+  if (!hhmm) return hhmm;
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr, 10);
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${mStr}<span class="kt-ampm"> ${period}</span>`;
+}
 
 const ROUND_ORDER = ['32強','16強','8強','4強','季軍賽','決賽'];
 const ROUND_ICONS = {
@@ -272,8 +283,8 @@ function renderMatchCard(m, isFinal) {
   } else {
     const time = m.time_utc8 || '時間待定';
     const date = m.date || '';
-    centerHtml = `<div class="kickoff-time" aria-label="開賽時間 ${date} ${time}">${date ? date.slice(5) + ' ' : ''}${time}</div>`;
-    scoreAria  = `${t1name} 對 ${t2name}，${date} ${time}`;
+    centerHtml = `<div class="kickoff-time" aria-label="開賽時間 ${date} ${time} 台灣時間"><span>${date ? date.slice(5) + ' ' : ''}${fmtTime(time)}</span><span class="tz-note" aria-hidden="true">台灣時間</span></div>`;
+    scoreAria  = `${t1name} 對 ${t2name}，${date} ${time} 台灣時間`;
   }
 
   const parts = [];

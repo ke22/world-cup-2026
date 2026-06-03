@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
-<title>FIFA 世界杯 2026 賽程</title>
+<title>世界盃每日賽程</title>
 <style>
 /* ── CNA Design System Variables ── */
 :root {
@@ -23,8 +23,8 @@
   --header-from: #13579f;
   --header-to: #0f4b8f;
   --live-color: #d63200;
-  --match-card-min-height: 112px;
   --match-card-gap: 8px;
+  --schedule-frame-min-height: 847px;
 }
 
 /* ── Reset ── */
@@ -51,7 +51,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   max-width: 900px;
   margin: 0 auto;
   padding: 14px 14px 0;
-  min-height: 100svh;
+  min-height: max(100svh, var(--schedule-frame-min-height));
   display: flex;
   flex-direction: column;
 }
@@ -136,7 +136,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
 /* ── Match list ── */
 .match-list {
   padding: 12px 14px 14px;
-  min-height: calc((var(--match-card-min-height) * 4) + (var(--match-card-gap) * 3) + 26px);
 }
 .day-header { padding: 4px 0 10px; }
 .day-header-title { font-size: 0.83rem; font-weight: 600; color: var(--muted); }
@@ -147,7 +146,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: var(--match-card-gap);
-  min-height: var(--match-card-min-height);
   background: var(--surface);
   box-shadow: 0 2px 8px rgba(15, 75, 143, 0.04);
   transition: box-shadow 0.15s;
@@ -178,7 +176,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .score-finished { font-size: 1.8rem; font-weight: 800; color: var(--fg); letter-spacing: 4px; }
 .score-live     { font-size: 1.7rem; font-weight: 800; color: var(--live-color); letter-spacing: 4px; }
-.kickoff-time   { font-size: 1.6rem; font-weight: 300; color: var(--accent); }
+.kickoff-time   { font-size: 1.6rem; font-weight: 300; color: var(--accent); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.kt-ampm        { font-size: 0.6em; font-weight: 500; }
+.tz-note        { font-size: 0.58rem; font-weight: 400; color: var(--muted); letter-spacing: 0.3px; }
 .live-badge {
   display: flex; align-items: center; gap: 5px;
   font-size: 0.72rem; font-weight: 700; color: var(--live-color); letter-spacing: 0.8px;
@@ -265,9 +265,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .group-table td:nth-child(2) { text-align: left; padding-left: 6px; }
 .group-table .rank { color: var(--muted); font-size: 11px; }
-.group-table .team-cell { display: flex; align-items: center; gap: 5px; }
-.group-table .t-flag { font-size: 14px; }
-.group-table .t-name { font-size: 11px; font-weight: 600; color: var(--fg); }
+.group-table .team-cell { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.group-table .t-flag { font-size: 14px; flex-shrink: 0; }
+.group-table .t-name { font-size: 11px; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .group-table .pts-cell { font-weight: 800; color: var(--accent); }
 
 img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
@@ -315,6 +315,15 @@ let activeDate       = '';     // YYYY-MM-DD
 let liveTimer        = null;
 
 // ─── Date utilities ───────────────────────────
+
+function fmtTime(hhmm) {
+  if (!hhmm) return hhmm;
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr, 10);
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${mStr}<span class="kt-ampm"> ${period}</span>`;
+}
 
 function toYMD(d) {
   const y = d.getFullYear();
@@ -443,10 +452,9 @@ function stopLiveRefresh() {
 function renderShell() {
   document.getElementById('app').innerHTML = `
     <div class="header">
-      <span class="header-title">⚽ FIFA 世界杯 2026 賽程</span>
+      <span class="header-title">世界盃每日賽程</span>
       <div class="header-actions">
         <button class="btn-action test" id="btn-test">測試比分</button>
-        <span class="ver-tag">v1.1</span>
         <img src="cna_logo.svg" class="cna-logo" alt="CNA">
       </div>
     </div>
@@ -577,7 +585,7 @@ function renderMatchCard(m) {
       <div class="score-live">${m.score1}&thinsp;:&thinsp;${m.score2}</div>
     `;
   } else {
-    centerHtml = `<div class="kickoff-time">${m.time_utc8}</div>`;
+    centerHtml = `<div class="kickoff-time"><span>${fmtTime(m.time_utc8)}</span><span class="tz-note">台灣時間</span></div>`;
   }
 
   // Info line: "第1輪 · A組 · Estadio Azteca · 墨西哥城" or "8強 · venue · city"
@@ -700,8 +708,10 @@ function selectDate(ymd) {
 
 function notifyHeight() {
   try {
+    const minHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--schedule-frame-min-height'), 10) || 847;
+    const height = Math.max(document.documentElement.scrollHeight, minHeight);
     window.parent.postMessage(
-      { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
+      { type: 'wc2026-resize', height },
       '*'
     );
   } catch {}

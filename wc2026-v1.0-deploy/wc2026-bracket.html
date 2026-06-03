@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
-<title>FIFA 世界杯 2026 賽程樹</title>
+<title>世界盃對戰表</title>
 <style>
 /* ── CNA Design System ── */
 :root {
@@ -102,6 +102,7 @@ body {
 
   /* nav vertical within 76px */
   .center-nav { display: flex !important; flex-direction: column; gap: 4px; width: 100%; margin-top: 4px; }
+  .center-nav-note { display: block; }
   .cnav-btn { width: 100%; text-align: center; padding: 10px 8px; font-size: 0.67rem; }
 
   .bracket-tree { min-width: 100%; align-items: stretch; justify-content: center; }
@@ -468,6 +469,14 @@ body {
 
 /* ── Center nav (mobile only — hidden on desktop) ── */
 .center-nav { display: none; }
+.center-nav-note {
+  display: none;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
 .cnav-btn {
   background: linear-gradient(180deg, #ffffff 0%, #e2edf9 100%);
   border: 1px solid rgba(15,75,143,0.24);
@@ -479,12 +488,15 @@ body {
   transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s, transform 0.12s;
   white-space: nowrap;
   min-height: 36px;
+  -webkit-tap-highlight-color: transparent;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.92),
     inset 0 -2px 0 rgba(15,75,143,0.12),
     0 3px 0 rgba(15,75,143,0.22),
     0 6px 12px rgba(15,75,143,0.14);
 }
+.cnav-btn:focus,
+.cnav-btn:focus-visible { outline: none; outline: 0; }
 .cnav-btn:hover {
   background: linear-gradient(180deg, #ffffff 0%, #d5e7fb 100%);
   border-color: var(--accent);
@@ -546,6 +558,13 @@ body {
   border-radius: 0 0 16px 16px;
   box-shadow: 0 10px 30px var(--shadow);
   overflow: hidden;
+}
+.mobile-nav-note {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  padding: 6px 12px 2px;
+  letter-spacing: 0.03em;
 }
 
 /* Accordion section */
@@ -668,8 +687,7 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 
 <div class="page">
   <header class="page-header">
-    <span class="page-header-title">🏆 FIFA 世界杯 2026 賽程樹</span>
-    <span class="ver-tag">v1.1</span>
+    <span class="page-header-title">世界盃對戰表</span>
     <img src="cna_logo.svg" class="cna-logo" alt="CNA">
   </header>
 
@@ -918,8 +936,7 @@ function renderDesktop(matches) {
   const rightGroups = 'GHIJKL'.split('');
 
   const legendHtml = `<div class="seed-legend">
-    <strong>賽位代號說明：</strong>
-    「A組第1」= A 組第 1 名出線；「3名(ABCDF)」= 從 A/B/C/D/F 組中成績最佳的第 3 名（共 12 組取 8 支第 3 名晉級）
+    <strong>點擊按鈕展開賽程</strong>
   </div>`;
 
   const mobile = window.innerWidth < 660;
@@ -994,11 +1011,13 @@ function renderDesktop(matches) {
         ${innerHtml}
       </div>
       <div class="center-nav">
-        <button class="cnav-btn" data-round="fin" onclick="mobileToggleRound('fin',this)">決賽</button>
-        <button class="cnav-btn" data-round="sf"  onclick="mobileToggleRound('sf',this)">4強</button>
-        <button class="cnav-btn" data-round="qf"  onclick="mobileToggleRound('qf',this)">8強</button>
-        <button class="cnav-btn" data-round="r16" onclick="mobileToggleRound('r16',this)">16強</button>
-        <button class="cnav-btn" data-round="r32" onclick="mobileToggleRound('r32',this)">32強</button>
+        <div class="center-nav-note">點擊按鈕展開賽程</div>
+        <button class="cnav-btn" data-round="fin" tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('fin',this)">決賽</button>
+        <button class="cnav-btn" data-round="sf"  tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('sf',this)">4強</button>
+        <button class="cnav-btn" data-round="qf"  tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('qf',this)">8強</button>
+        <button class="cnav-btn" data-round="r16" tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('r16',this)">16強</button>
+        <button class="cnav-btn" data-round="r32" tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('r32',this)">32強</button>
+        <div class="seed-legend"><strong>點擊按鈕展開賽程</strong></div>
       </div>
     </div>`;
   }
@@ -1118,6 +1137,8 @@ function mobileToggleRound(round, btn) {
   const willCollapse = !cols[0].classList.contains('collapsed');
   cols.forEach(c => c.classList.toggle('collapsed', willCollapse));
   btn.classList.toggle('active', !willCollapse);
+  btn.blur();
+  setTimeout(() => btn.blur(), 0);
   requestAnimationFrame(fitBracket);
 }
 
@@ -1142,6 +1163,7 @@ function toggleDesktopCol(col) {
     if (!c) return;
     c.classList.toggle('collapsed', willCollapse);
   });
+  syncMobileNavButtons();
   requestAnimationFrame(fitBracket);
 }
 
@@ -1226,6 +1248,7 @@ function renderMobile(matches, activePhase) {
   </div>`;
 
   return `<div class="mobile-panel">
+    <div class="mobile-nav-note">點擊按鈕展開賽程</div>
     ${sections}
     <div class="mobile-groups-wrap">
       <div class="mobile-groups-title">分組</div>
@@ -1268,6 +1291,10 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+document.addEventListener('focus', e => {
+  if (e.target.classList.contains('cnav-btn')) e.target.blur();
+}, true);
 </script>
 <script>
 if ('serviceWorker' in navigator) {

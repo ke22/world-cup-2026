@@ -63,18 +63,18 @@ button:hover { background: #eef2f6; }
 <body>
 
 <h1>CNA Embed Test — World Cup 2026 Charts</h1>
-<p class="subtitle">監聽 <code>wc2026-resize</code> postMessage 並動態調整 iframe 高度。初始高度 300px，收到訊息後自動撐開。</p>
+<p class="subtitle">監聽 <code>wc2026-resize</code> postMessage 並動態調整 iframe 高度。賽程初始高度 847px，其餘圖表初始高度 300px，收到訊息後自動撐開。</p>
 
 <div class="embed-block">
   <div class="embed-label">
     📅 wc2026-schedule.html (Mobile 375px)
-    <span class="height-badge" id="h-schedule">height: 300px</span>
+    <span class="height-badge" id="h-schedule">height: 847px</span>
   </div>
-  <iframe id="frame-schedule" src="wc2026-schedule.html" title="賽程"></iframe>
+  <iframe id="frame-schedule" src="wc2026-schedule.html" title="賽程" style="height:847px"></iframe>
   <div class="controls">
     <button onclick="setWidth('frame-schedule', 375)">375px (Mobile)</button>
     <button onclick="setWidth('frame-schedule', 900)" class="pc">900px (PC)</button>
-    <button onclick="resetHeight('frame-schedule', 'h-schedule')">Reset 300px</button>
+    <button onclick="resetHeight('frame-schedule')">Reset 847px</button>
   </div>
 </div>
 
@@ -87,7 +87,7 @@ button:hover { background: #eef2f6; }
   <div class="controls">
     <button onclick="setWidth('frame-groups', 375)">375px (Mobile)</button>
     <button onclick="setWidth('frame-groups', 900)">900px (PC)</button>
-    <button onclick="resetHeight('frame-groups', 'h-groups')">Reset 300px</button>
+    <button onclick="resetHeight('frame-groups')">Reset 300px</button>
   </div>
 </div>
 
@@ -96,11 +96,12 @@ button:hover { background: #eef2f6; }
     🌳 wc2026-bracket.html (Mobile 375px)
     <span class="height-badge" id="h-bracket">height: 300px</span>
   </div>
+  <div style="font-size:12px;color:#66758a;margin-bottom:6px;">點擊按鈕展開賽程</div>
   <iframe id="frame-bracket" src="wc2026-bracket.html" title="賽程樹"></iframe>
   <div class="controls">
     <button onclick="setWidth('frame-bracket', 375)">375px (Mobile)</button>
     <button onclick="setWidth('frame-bracket', 900)">900px (PC)</button>
-    <button onclick="resetHeight('frame-bracket', 'h-bracket')">Reset 300px</button>
+    <button onclick="resetHeight('frame-bracket')">Reset 300px</button>
   </div>
 </div>
 
@@ -111,9 +112,9 @@ button:hover { background: #eef2f6; }
 
 <script>
 const frameMap = {
-  'frame-schedule': 'h-schedule',
-  'frame-groups':   'h-groups',
-  'frame-bracket':  'h-bracket',
+  'frame-schedule': { badgeId: 'h-schedule', minHeight: 847 },
+  'frame-groups':   { badgeId: 'h-groups',   minHeight: 300 },
+  'frame-bracket':  { badgeId: 'h-bracket',  minHeight: 300 },
 };
 
 window.addEventListener('message', e => {
@@ -134,9 +135,10 @@ window.addEventListener('message', e => {
 
   if (frameId) {
     const frame = document.getElementById(frameId);
-    const badgeId = frameMap[frameId];
-    frame.style.height = height + 'px';
-    document.getElementById(badgeId).textContent = `height: ${height}px`;
+    const config = frameMap[frameId];
+    const nextHeight = Math.max(height, config.minHeight);
+    frame.style.height = nextHeight + 'px';
+    document.getElementById(config.badgeId).textContent = `height: ${nextHeight}px`;
   }
 
   // Log
@@ -156,10 +158,11 @@ function setWidth(frameId, px) {
   frame.style.width = px + 'px';
 }
 
-function resetHeight(frameId, badgeId) {
+function resetHeight(frameId) {
   const frame = document.getElementById(frameId);
-  frame.style.height = '300px';
-  document.getElementById(badgeId).textContent = 'height: 300px';
+  const config = frameMap[frameId];
+  frame.style.height = config.minHeight + 'px';
+  document.getElementById(config.badgeId).textContent = `height: ${config.minHeight}px`;
 }
 </script>
 </body>

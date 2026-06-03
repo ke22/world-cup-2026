@@ -189,7 +189,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .score-finished { font-size: 2rem; font-weight: 800; color: var(--fg); letter-spacing: 4px; }
 .score-live     { font-size: 1.8rem; font-weight: 800; color: var(--live); letter-spacing: 4px; }
-.kickoff-time   { font-size: 1.8rem; font-weight: 400; color: var(--accent); }
+.kickoff-time   { font-size: 1.8rem; font-weight: 400; color: var(--accent); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.kt-ampm        { font-size: 0.6em; font-weight: 500; }
+.tz-note        { font-size: 0.62rem; font-weight: 400; color: var(--muted); letter-spacing: 0.3px; }
 .live-badge {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.78rem; font-weight: 800; color: var(--live); letter-spacing: 1px;
@@ -250,6 +252,15 @@ let allMatches  = [];
 let windowStart = null;
 let activeDate  = '';
 let liveTimer   = null;
+
+function fmtTime(hhmm) {
+  if (!hhmm) return hhmm;
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr, 10);
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${mStr}<span class="kt-ampm"> ${period}</span>`;
+}
 
 function toYMD(d) {
   const y = d.getFullYear();
@@ -476,8 +487,8 @@ function renderMatchCard(m) {
     `;
     scoreAria = `直播中：${t1name} ${m.score1} 比 ${m.score2} ${t2name}`;
   } else {
-    centerHtml = `<div class="kickoff-time" aria-label="開賽時間 ${m.time_utc8}">${m.time_utc8}</div>`;
-    scoreAria  = `${t1name} 對 ${t2name}，開賽時間 ${m.time_utc8}`;
+    centerHtml = `<div class="kickoff-time" aria-label="開賽時間 ${m.time_utc8} 台灣時間"><span>${fmtTime(m.time_utc8)}</span><span class="tz-note" aria-hidden="true">台灣時間</span></div>`;
+    scoreAria  = `${t1name} 對 ${t2name}，開賽時間 ${m.time_utc8} 台灣時間`;
   }
 
   const parts = [];
