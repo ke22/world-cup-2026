@@ -195,24 +195,32 @@ body {
   overflow: hidden;
   background: var(--surface);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;   /* label + teams side by side */
   align-items: stretch;
 }
-.group-name {
+/* Left col: label on LEFT side */
+.group-box .group-name {
   background: var(--gc, #aaa);
   color: #fff;
-  font-size: 0.67rem; font-weight: 900;
+  font-size: 0.72rem; font-weight: 900;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
   text-align: center;
-  padding: 2px 0;
+  padding: 4px 2px;
   flex-shrink: 0;
-  letter-spacing: 0;
+  letter-spacing: 1px;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Right col: label on RIGHT side */
+.groups-col.right-col .group-box {
+  flex-direction: row-reverse;
 }
 .gb-teams {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  padding: 2px 3px;
+  padding: 2px 4px;
 }
 .gb-row {
   display: flex;
@@ -220,8 +228,8 @@ body {
   align-items: center;
   gap: 3px;
 }
-.gb-flag { font-size: 0.67rem; flex-shrink: 0; line-height: 1; }
-.gb-name { font-size: 0.56rem; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gb-flag { font-size: 0.78rem; flex-shrink: 0; line-height: 1; }
+.gb-name { font-size: 0.65rem; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Round column ── */
 .round-col {
@@ -399,7 +407,7 @@ body {
 .mn-row:last-of-type { border-bottom: none; }
 
 .mn-flag  { font-size: 14px; flex-shrink: 0; line-height: 1; }
-.mn-name  { flex: 1; font-size: 0.9rem; font-weight: 700; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mn-name  { flex: 1; font-size: 0.72rem; font-weight: 700; color: var(--fg); line-height: 1.25; word-break: break-all; }
 .mn-name.seed { font-size: 11px; font-weight: 600; color: var(--accent-2); font-style: normal; }
 .mn-name.tbd  { font-size: 11px; color: var(--muted); font-weight: 400; font-style: italic; }
 .mn-score { font-size: 0.9rem; font-weight: 800; color: var(--fg); min-width: 14px; text-align: right; flex-shrink: 0; }
@@ -469,7 +477,7 @@ body {
   display: flex; align-items: center; gap: 5px;
 }
 .center-slot .mn-flag { font-size: 14px; flex-shrink: 0; }
-.center-slot .mn-name { flex: 1; font-size: 13px; font-weight: 700; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.center-slot .mn-name { flex: 1; font-size: 0.72rem; font-weight: 700; color: var(--fg); line-height: 1.25; word-break: break-all; }
 .center-slot .mn-name.tbd { color: var(--muted); font-weight: 400; font-style: italic; font-size: 11px; }
 .center-slot .mn-score { font-size: 13px; font-weight: 800; color: var(--fg); }
 .center-slot .mn-score.winner { color: var(--accent); }
@@ -808,7 +816,7 @@ function renderDesktop(matches) {
 
   const COL_W = 92;   // R32/R16/QF/SF columns
   const FIN_W = 82;   // Final columns (one team each side)
-  const GRP_W = 68;
+  const GRP_W = 80;
   const CEN_W = 76;   // Trophy only
   const COL_C = 26;
 
