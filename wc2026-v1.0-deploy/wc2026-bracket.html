@@ -497,8 +497,6 @@ body {
     0 3px 0 rgba(15,75,143,0.22),
     0 6px 12px rgba(15,75,143,0.14);
 }
-.cnav-btn:focus,
-.cnav-btn:focus-visible { outline: none; outline: 0; }
 .cnav-btn:hover {
   background: linear-gradient(180deg, #ffffff 0%, #d5e7fb 100%);
   border-color: var(--accent);
@@ -1013,11 +1011,11 @@ function renderDesktop(matches) {
       </div>
       <div class="center-nav">
         <div class="center-nav-note">點擊按鈕展開賽程</div>
-        <button class="cnav-btn" data-round="fin" tabindex="-1" onclick="mobileToggleRound('fin',this)">決賽</button>
-        <button class="cnav-btn" data-round="sf"  tabindex="-1" onclick="mobileToggleRound('sf',this)">4強</button>
-        <button class="cnav-btn" data-round="qf"  tabindex="-1" onclick="mobileToggleRound('qf',this)">8強</button>
-        <button class="cnav-btn" data-round="r16" tabindex="-1" onclick="mobileToggleRound('r16',this)">16強</button>
-        <button class="cnav-btn" data-round="r32" tabindex="-1" onclick="mobileToggleRound('r32',this)">32強</button>
+        <div class="cnav-btn" data-round="fin" role="button" onclick="mobileToggleRound('fin',this)">決賽</div>
+        <div class="cnav-btn" data-round="sf"  role="button" onclick="mobileToggleRound('sf',this)">4強</div>
+        <div class="cnav-btn" data-round="qf"  role="button" onclick="mobileToggleRound('qf',this)">8強</div>
+        <div class="cnav-btn" data-round="r16" role="button" onclick="mobileToggleRound('r16',this)">16強</div>
+        <div class="cnav-btn" data-round="r32" role="button" onclick="mobileToggleRound('r32',this)">32強</div>
         <div class="seed-legend"><strong>點擊按鈕展開賽程</strong></div>
       </div>
     </div>`;
@@ -1138,8 +1136,6 @@ function mobileToggleRound(round, btn) {
   const willCollapse = !cols[0].classList.contains('collapsed');
   cols.forEach(c => c.classList.toggle('collapsed', willCollapse));
   btn.classList.toggle('active', !willCollapse);
-  btn.blur();
-  setTimeout(() => btn.blur(), 0);
   requestAnimationFrame(fitBracket);
 }
 
@@ -1293,9 +1289,6 @@ async function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
-document.addEventListener('focus', e => {
-  if (e.target.classList.contains('cnav-btn')) e.target.blur();
-}, true);
 </script>
 <script>
 if ('serviceWorker' in navigator) {
