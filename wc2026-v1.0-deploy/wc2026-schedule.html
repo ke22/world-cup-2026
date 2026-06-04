@@ -94,9 +94,11 @@ button { font-family: inherit; cursor: pointer; border: none; }
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
 }
-.btn-action:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.55); }
 .btn-action.test { border-color: rgba(255,180,120,0.5); color: #ffd4a8; }
-.btn-action.test:hover { background: rgba(255,140,60,0.18); }
+@media (hover: hover) {
+  .btn-action:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.55); }
+  .btn-action.test:hover { background: rgba(255,140,60,0.18); }
+}
 
 /* ── Date nav ── */
 .date-nav {
@@ -113,7 +115,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   flex-shrink: 0; line-height: 1; border-radius: 8px;
   transition: background 0.12s;
 }
-.nav-arrow:hover { background: var(--accent-soft); }
+@media (hover: hover) { .nav-arrow:hover { background: var(--accent-soft); } }
 .date-tabs { display: flex; flex: 1; justify-content: space-around; overflow: hidden; }
 .date-tab {
   display: flex; flex-direction: column; align-items: center;
@@ -121,7 +123,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   flex: 1; min-width: 0; color: var(--muted);
   transition: background 0.12s, color 0.12s;
 }
-.date-tab:hover { background: var(--accent-soft); color: var(--fg); }
+@media (hover: hover) { .date-tab:hover { background: var(--accent-soft); color: var(--fg); } }
 .date-tab.active {
   background: rgba(15, 75, 143, 0.10);
   color: var(--accent);
@@ -151,7 +153,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   box-shadow: 0 2px 8px rgba(15, 75, 143, 0.04);
   transition: box-shadow 0.15s;
 }
-.match-card:hover { box-shadow: 0 4px 16px rgba(15, 75, 143, 0.10); }
+@media (hover: hover) { .match-card:hover { box-shadow: 0 4px 16px rgba(15, 75, 143, 0.10); } }
 .match-card.live {
   background: #fff8f5;
   border-color: rgba(214, 50, 0, 0.3);
@@ -231,7 +233,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s;
 }
-.btn-close:hover { background: rgba(255,255,255,0.28); }
+@media (hover: hover) { .btn-close:hover { background: rgba(255,255,255,0.28); } }
 
 /* ── Groups grid ── */
 .groups-grid {

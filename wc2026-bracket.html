@@ -164,7 +164,7 @@ body {
 }
 .col-grip::after { content: '‹'; line-height: 1; }
 .bracket-right .col-grip::after { content: '›'; }
-.col-grip:hover {
+@media (hover: hover) { .col-grip:hover {
   background: linear-gradient(180deg, #2f78ce 0%, var(--accent) 100%);
   color: #fff;
   border-right-color: rgba(6,42,89,0.55);
@@ -172,7 +172,7 @@ body {
     inset 1px 0 0 rgba(255,255,255,0.35),
     inset -2px 0 0 rgba(6,42,89,0.28),
     -5px 0 12px rgba(15,75,143,0.28);
-}
+} }
 .col-grip:active {
   box-shadow:
     inset 2px 0 5px rgba(6,42,89,0.32),
@@ -277,7 +277,7 @@ body {
   padding-top: 0;
   transition: width 0.2s ease, background 0.15s, opacity 0.15s;
 }
-.round-col.collapsed:hover { background: var(--accent-2); opacity: 0.9; }
+@media (hover: hover) { .round-col.collapsed:hover { background: var(--accent-2); opacity: 0.9; } }
 .round-col.collapsed .col-content-wrap { display: none; }
 .round-col .col-dots {
   display: none;
@@ -578,9 +578,11 @@ body {
   box-shadow: inset 0 -2px 0 rgba(15,75,143,0.08);
   transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
 }
-.round-toggle-btn:hover {
-  background: linear-gradient(180deg, #ffffff 0%, #e3eefb 100%);
-  box-shadow: inset 0 -2px 0 rgba(15,75,143,0.16), 0 3px 8px rgba(15,75,143,0.10);
+@media (hover: hover) {
+  .round-toggle-btn:hover {
+    background: linear-gradient(180deg, #ffffff 0%, #e3eefb 100%);
+    box-shadow: inset 0 -2px 0 rgba(15,75,143,0.16), 0 3px 8px rgba(15,75,143,0.10);
+  }
 }
 .round-toggle-btn:active {
   transform: translateY(1px);
