@@ -938,7 +938,7 @@ function renderDesktop(matches) {
   const rightGroups = 'GHIJKL'.split('');
 
   const legendHtml = `<div class="seed-legend">
-    <strong>賽程代號說明：</strong>「A組第1」= A 組第 1 名出線；<span class="mn-name seed">3名(CDFGH)</span> = C/D/F/G/H 組最佳第 3 名（12 組取 8 支晉級）
+    <strong>賽程代號說明：</strong>「A組第1」= A 組第 1 名出線；「3名(CDFGH)」= C/D/F/G/H 組最佳第 3 名（12 組取 8 支晉級）
   </div>`;
 
   const mobile = window.innerWidth < 660;
@@ -1244,7 +1244,7 @@ function renderMobile(matches, activePhase) {
   const groupBoxes = 'ABCDEFGHIJKL'.split('').map(l => groupBox(l,'sm')).join('');
 
   const legendHtml = `<div class="mobile-seed-legend">
-    <strong>代號說明：</strong>「A組第1」= A 組第 1 名出線；<span class="mn-name seed">3名(CDFGH)</span> = 指定組最佳第 3 名（12 組取 8 支晉級）
+    <strong>代號說明：</strong>「A組第1」= A 組第 1 名出線；「3名(CDFGH)」= 指定組最佳第 3 名（12 組取 8 支晉級）
   </div>`;
 
   return `<div class="mobile-panel">
