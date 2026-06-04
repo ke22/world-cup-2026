@@ -157,7 +157,7 @@ footer {
     <img src="cna_logo.svg" class="page-header-logo" alt="CNA">
     <div class="page-header-text">
       <h1>FIFA 世界杯 2026 — 互動圖表嵌入代碼</h1>
-      <p>供 CNA 記者 / 編輯複製貼上使用 · 更新日期：2026-06-02</p>
+      <p>供 CNA 記者 / 編輯複製貼上使用 · 更新日期：2026-06-04</p>
     </div>
   </header>
 
@@ -231,46 +231,6 @@ footer {
     </div>
   </div>
 
-  <!-- ── A11y 版 ── -->
-  <div style="margin-bottom:24px;">
-    <div style="background:#003d82;border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:16px;font-weight:800;color:#fff;">♿ 無障礙版（WCAG 2.1 AA + 長輩友善）</span>
-      <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.2);color:#fff;padding:3px 10px;border-radius:20px;">v1.1-a11y</span>
-    </div>
-    <p style="font-size:13px;color:#66758a;margin-bottom:16px;">字型 18px、高對比色、48px 觸控目標、skip link、ARIA 語義結構。淘汰賽改為清單模式，無需視覺賽程樹即可瀏覽所有比賽。</p>
-
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header"><h2>📅 賽程表（無障礙版）</h2><span class="tag">wc2026-schedule-a11y.html</span></div>
-      <div class="card-body">
-        <div class="code-block" id="code-schedule-a11y">
-          <button class="copy-btn" onclick="copyCode('code-schedule-a11y', this)">複製</button>
-          <pre id="pre-schedule-a11y"></pre>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header"><h2>🏆 分組積分榜（無障礙版）</h2><span class="tag">wc2026-groups-a11y.html</span></div>
-      <div class="card-body">
-        <div class="code-block" id="code-groups-a11y">
-          <button class="copy-btn" onclick="copyCode('code-groups-a11y', this)">複製</button>
-          <pre id="pre-groups-a11y"></pre>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header"><h2>🌳 淘汰賽（無障礙版）</h2><span class="tag">wc2026-bracket-a11y.html</span></div>
-      <div class="card-body">
-        <div class="code-block" id="code-bracket-a11y">
-          <button class="copy-btn" onclick="copyCode('code-bracket-a11y', this)">複製</button>
-          <pre id="pre-bracket-a11y"></pre>
-        </div>
-        <p class="note">淘汰賽以各輪次卡片清單呈現，適合銀髮族與輔助科技用戶。</p>
-      </div>
-    </div>
-  </div>
-
   <!-- ── postMessage 說明 ── -->
   <div class="postmsg-note">
     <strong>⚡ 自動高度調整說明</strong><br>
@@ -290,12 +250,6 @@ const CHARTS = [
   { id: 'schedule', file: 'wc2026-schedule.html', iframeId: 'cna-wc2026-schedule', height: 847 },
   { id: 'groups',   file: 'wc2026-groups.html',   iframeId: 'cna-wc2026-groups',   height: 460 },
   { id: 'bracket',  file: 'wc2026-bracket.html',  iframeId: 'cna-wc2026-bracket',  height: 460 },
-];
-
-const A11Y_CHARTS = [
-  { id: 'schedule-a11y', file: 'wc2026-schedule-a11y.html', iframeId: 'cna-wc2026-schedule-a11y', height: 847 },
-  { id: 'groups-a11y',   file: 'wc2026-groups-a11y.html',   iframeId: 'cna-wc2026-groups-a11y',   height: 460 },
-  { id: 'bracket-a11y',  file: 'wc2026-bracket-a11y.html',  iframeId: 'cna-wc2026-bracket-a11y',  height: 460 },
 ];
 
 function buildCode(baseUrl, chart) {
@@ -325,10 +279,6 @@ function renderAll() {
   const base = document.getElementById('baseUrl').value.replace(/\/$/, '');
   CHARTS.forEach(c => {
     document.getElementById('pre-' + c.id).textContent = buildCode(base, c);
-  });
-  A11Y_CHARTS.forEach(c => {
-    const el = document.getElementById('pre-' + c.id);
-    if (el) el.textContent = buildCode(base, c);
   });
 }
 
