@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
+<link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async></script>
 <title>世界盃對戰表</title>
 <style>
@@ -937,7 +938,7 @@ function renderDesktop(matches) {
   const rightGroups = 'GHIJKL'.split('');
 
   const legendHtml = `<div class="seed-legend">
-    <strong>點擊按鈕展開賽程</strong>
+    <strong>賽程代號說明：</strong>「A組第1」= A 組第 1 名出線；<span class="mn-name seed">3名(CDFGH)</span> = C/D/F/G/H 組最佳第 3 名（12 組取 8 支晉級）
   </div>`;
 
   const mobile = window.innerWidth < 660;
@@ -1012,13 +1013,13 @@ function renderDesktop(matches) {
         ${innerHtml}
       </div>
       <div class="center-nav">
-        <div class="center-nav-note">點擊按鈕展開賽程</div>
+        <div class="center-nav-note">點擊展開</div>
         <div class="cnav-btn" data-round="fin" role="button" onclick="mobileToggleRound('fin',this)">決賽</div>
         <div class="cnav-btn" data-round="sf"  role="button" onclick="mobileToggleRound('sf',this)">4強</div>
         <div class="cnav-btn" data-round="qf"  role="button" onclick="mobileToggleRound('qf',this)">8強</div>
         <div class="cnav-btn" data-round="r16" role="button" onclick="mobileToggleRound('r16',this)">16強</div>
         <div class="cnav-btn" data-round="r32" role="button" onclick="mobileToggleRound('r32',this)">32強</div>
-        <div class="seed-legend"><strong>點擊按鈕展開賽程</strong></div>
+        <div class="seed-legend">點擊按鈕展</div>
       </div>
     </div>`;
   }
@@ -1243,11 +1244,11 @@ function renderMobile(matches, activePhase) {
   const groupBoxes = 'ABCDEFGHIJKL'.split('').map(l => groupBox(l,'sm')).join('');
 
   const legendHtml = `<div class="mobile-seed-legend">
-    <strong>代號說明：</strong>「A組第1」= A 組第 1 名；「3名(ABCDF)」= ABCDF 組最佳第 3 名（取 8 支）
+    <strong>代號說明：</strong>「A組第1」= A 組第 1 名出線；<span class="mn-name seed">3名(CDFGH)</span> = 指定組最佳第 3 名（12 組取 8 支晉級）
   </div>`;
 
   return `<div class="mobile-panel">
-    <div class="mobile-nav-note">點擊按鈕展開賽程</div>
+    <div class="mobile-nav-note">點擊按鈕展</div>
     ${sections}
     <div class="mobile-groups-wrap">
       <div class="mobile-groups-title">分組</div>
