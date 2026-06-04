@@ -42,6 +42,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 14px 14px 0;
+  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -265,7 +266,11 @@ function scrollToGroup(letter) {
   const container = document.getElementById('groups-container');
   if (el && container) {
     const top = el.offsetTop - container.offsetTop;
-    container.scrollTo({ top, behavior: 'smooth' });
+    if ('scrollBehavior' in document.documentElement.style) {
+      container.scrollTo({ top, behavior: 'smooth' });
+    } else {
+      container.scrollTop = top;
+    }
   }
 }
 
