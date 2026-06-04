@@ -485,10 +485,11 @@ body {
   padding: 6px 10px;
   font-size: 0.65rem; font-weight: 800; color: var(--accent);
   cursor: pointer; font-family: inherit;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s, transform 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
   white-space: nowrap;
   min-height: 36px;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.92),
     inset 0 -2px 0 rgba(15,75,143,0.12),
@@ -507,7 +508,6 @@ body {
     0 7px 14px rgba(15,75,143,0.20);
 }
 .cnav-btn:active {
-  transform: translateY(2px);
   box-shadow:
     inset 0 2px 4px rgba(6,42,89,0.24),
     0 1px 0 rgba(15,75,143,0.22),
@@ -1012,11 +1012,11 @@ function renderDesktop(matches) {
       </div>
       <div class="center-nav">
         <div class="center-nav-note">點擊按鈕展開賽程</div>
-        <button class="cnav-btn" data-round="fin" tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('fin',this)">決賽</button>
-        <button class="cnav-btn" data-round="sf"  tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('sf',this)">4強</button>
-        <button class="cnav-btn" data-round="qf"  tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('qf',this)">8強</button>
-        <button class="cnav-btn" data-round="r16" tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('r16',this)">16強</button>
-        <button class="cnav-btn" data-round="r32" tabindex="-1" onpointerdown="event.preventDefault()" onclick="mobileToggleRound('r32',this)">32強</button>
+        <button class="cnav-btn" data-round="fin" tabindex="-1" onclick="mobileToggleRound('fin',this)">決賽</button>
+        <button class="cnav-btn" data-round="sf"  tabindex="-1" onclick="mobileToggleRound('sf',this)">4強</button>
+        <button class="cnav-btn" data-round="qf"  tabindex="-1" onclick="mobileToggleRound('qf',this)">8強</button>
+        <button class="cnav-btn" data-round="r16" tabindex="-1" onclick="mobileToggleRound('r16',this)">16強</button>
+        <button class="cnav-btn" data-round="r32" tabindex="-1" onclick="mobileToggleRound('r32',this)">32強</button>
         <div class="seed-legend"><strong>點擊按鈕展開賽程</strong></div>
       </div>
     </div>`;
