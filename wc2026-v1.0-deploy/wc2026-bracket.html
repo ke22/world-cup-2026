@@ -117,6 +117,11 @@ body {
   justify-content: center;
   overflow: hidden;
 }
+.bracket-outer.fit-scroll {
+  display: block;
+  overflow-x: auto;
+  overflow-y: visible;
+}
 
 /* Outer wrapper */
 .bracket-panel {
@@ -1101,6 +1106,7 @@ function fitBracket() {
   const scaleH = availH ? availH / naturalH : 1;
   const scale  = Math.min(scaleW, scaleH);
 
+  const wrap = outer.closest('.bracket-outer-wrap');
   if (scale >= 1) {
     // Content fits — scale up to fill frame
     inner.style.transform = `scale(${scale})`;
@@ -1108,9 +1114,11 @@ function fitBracket() {
     const diff = (naturalH * scale - naturalH) / 2;
     inner.style.marginTop    = diff + 'px';
     inner.style.marginBottom = diff + 'px';
+    if (wrap) wrap.style.overflowX = '';
   } else {
-    // Content wider than frame — keep natural size, enable scroll, center
+    // Content wider than frame — enable scroll
     outer.classList.add('fit-scroll');
+    if (wrap) wrap.style.overflowX = 'auto';
     requestAnimationFrame(() => {
       outer.scrollLeft = Math.max(0, (naturalW - availW) / 2);
     });

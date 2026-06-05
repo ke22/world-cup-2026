@@ -716,7 +716,7 @@ function notifyHeight() {} // kept for compatibility — ResizeObserver handles 
 
 try {
   new ResizeObserver(() => {
-    const el = document.querySelector('.panel') || document.querySelector('.wrapper');
+    const el = document.querySelector('.wrapper');
     const h = el ? el.offsetTop + el.offsetHeight : document.body.offsetHeight;
     window.parent.postMessage({ type: 'wc2026-resize', height: Math.ceil(h) }, '*');
   }).observe(document.body);
