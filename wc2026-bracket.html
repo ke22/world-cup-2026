@@ -803,7 +803,7 @@ function buildNode(m) {
   function row(t, score, idx) {
     const tbd  = isTBD(t);
     const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
-    const is3rd = seed && /^3[A-L]+$/.test(seed);
+    const is3rd = seed && /^3\s*[A-L]+$/.test(seed);
     const label = seed ? (is3rd ? '待定' : formatSeed(seed)) : (tbd ? '' : teamName(t));
     const nameCls = seed ? (is3rd ? 'tbd' : 'seed') : (tbd ? 'tbd' : '');
     const flagHtml = tbd ? '' : `<span class="mn-flag">${t.flag}</span>`;
@@ -1187,7 +1187,7 @@ function buildMobileMatch(m) {
   function mTeam(t, idx) {
     const tbd  = isTBD(t);
     const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
-    const is3rd = seed && /^3[A-L]+$/.test(seed);
+    const is3rd = seed && /^3\s*[A-L]+$/.test(seed);
     const label = seed ? (is3rd ? '待定' : formatSeed(seed)) : (tbd ? '待定' : teamName(t));
     const nc = seed ? (is3rd ? ' tbd' : ' seed') : (tbd ? ' tbd' : '');
     return `<div class="mobile-team">
