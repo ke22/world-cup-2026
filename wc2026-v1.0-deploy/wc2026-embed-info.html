@@ -247,32 +247,17 @@ footer {
 
 <script>
 const CHARTS = [
-  { id: 'schedule', file: 'wc2026-schedule.html', iframeId: 'cna-wc2026-schedule', height: 847 },
-  { id: 'groups',   file: 'wc2026-groups.html',   iframeId: 'cna-wc2026-groups',   height: 460 },
-  { id: 'bracket',  file: 'wc2026-bracket.html',  iframeId: 'cna-wc2026-bracket',  height: 460 },
+  { id: 'schedule', file: 'wc2026-schedule.html', title: '世界盃每日賽程',   height: 800 },
+  { id: 'groups',   file: 'wc2026-groups.html',   title: '世界盃小組積分',   height: 600 },
+  { id: 'bracket',  file: 'wc2026-bracket.html',  title: '世界盃淘汰賽賽程樹', height: 620 },
 ];
 
 function buildCode(baseUrl, chart) {
-  return `<div>
-  <iframe
-    id="${chart.iframeId}"
-    src="${baseUrl}/${chart.file}"
-    width="100%"
-    height="${chart.height}"
-    frameborder="0"
-    scrolling="no"
-    style="border:none;display:block;"
-    title="FIFA 世界杯 2026 互動圖表">
-  </iframe>
-  <script>
-    window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'wc2026-resize') {
-        var f = document.getElementById('${chart.iframeId}');
-        if (f) f.style.height = e.data.height + 'px';
-      }
-    });
-  <\/script>
-</div>`;
+  return `<div class="wc2026-embed"
+  data-src="${baseUrl}/${chart.file}"
+  data-title="${chart.title}"
+  data-height="${chart.height}"></div>
+<script async src="${baseUrl}/embed-loader.js"><\/script>`;
 }
 
 function renderAll() {
