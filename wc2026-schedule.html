@@ -110,13 +110,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   gap: 0;
   overflow: hidden; /* ensure no overflow */
 }
-.nav-arrow {
-  background: none; border: none;
-  font-size: 1.2rem; color: var(--accent); padding: 4px 4px;
-  flex-shrink: 0; line-height: 1; border-radius: 8px;
-  transition: background 0.12s;
-}
-@media (hover: hover) { .nav-arrow:hover { background: var(--accent-soft); } }
 .date-tabs {
   display: flex; flex: 1;
   overflow: hidden;
@@ -524,7 +517,6 @@ function renderDateNav() {
     : '';
 
   nav.innerHTML = `
-    <button class="nav-arrow" id="nav-prev" aria-label="前一週">&#8249;</button>
     ${singleMonthHtml}
     <div class="date-tabs" role="tablist">
       ${tabs.map(({ ymd, wd, dayNum, month, hasMatch, isActive }, i) => `
@@ -540,14 +532,11 @@ function renderDateNav() {
         </button>
       `).join('')}
     </div>
-    <button class="nav-arrow" id="nav-next" aria-label="後一週">&#8250;</button>
   `;
 
   nav.querySelectorAll('.date-tab').forEach(btn =>
     btn.addEventListener('click', () => selectDate(btn.dataset.date))
   );
-  document.getElementById('nav-prev').addEventListener('click', () => shiftWindow(-7));
-  document.getElementById('nav-next').addEventListener('click', () => shiftWindow(7));
 
   // Swipe left/right on date-nav to navigate weeks
   let swipeX = 0, swipeY = 0, swiping = false;
