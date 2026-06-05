@@ -108,7 +108,18 @@ button { font-family: inherit; cursor: pointer; border: none; }
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
   gap: 0;
-  overflow: hidden; /* ensure no overflow */
+  overflow: hidden;
+}
+.nav-arrow {
+  display: none;           /* hidden on touch by default */
+  background: none; border: none;
+  font-size: 1.2rem; color: var(--accent); padding: 4px 6px;
+  flex-shrink: 0; line-height: 1; border-radius: 8px; cursor: pointer;
+  transition: background 0.12s;
+}
+@media (hover: hover) {
+  .nav-arrow { display: block; }   /* show on desktop */
+  .nav-arrow:hover { background: var(--accent-soft); }
 }
 .date-tabs {
   display: flex;
@@ -510,11 +521,23 @@ function renderDateNav() {
       </button>`;
   }).join('');
 
-  nav.innerHTML = `<div class="date-tabs" role="tablist">${tabsHtml}</div>`;
+  nav.innerHTML = `
+    <button class="nav-arrow" id="nav-prev" aria-label="往前">&#8249;</button>
+    <div class="date-tabs" role="tablist">${tabsHtml}</div>
+    <button class="nav-arrow" id="nav-next" aria-label="往後">&#8250;</button>
+  `;
 
   nav.querySelectorAll('.date-tab').forEach(btn =>
     btn.addEventListener('click', () => selectDate(btn.dataset.date))
   );
+
+  const tabsEl = nav.querySelector('.date-tabs');
+  document.getElementById('nav-prev').addEventListener('click', () => {
+    tabsEl.scrollBy({ left: -220, behavior: 'smooth' });
+  });
+  document.getElementById('nav-next').addEventListener('click', () => {
+    tabsEl.scrollBy({ left: 220, behavior: 'smooth' });
+  });
 
   scrollToActiveTab();
 }
