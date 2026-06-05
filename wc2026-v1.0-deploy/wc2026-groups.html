@@ -258,13 +258,11 @@ function renderAnchorNav(groupKeys) {
 
 function scrollToGroup(letter) {
   const el = document.getElementById(`group-${letter}`);
-  const container = document.getElementById('groups-container');
-  if (el && container) {
-    const top = el.offsetTop - container.offsetTop;
+  if (el) {
     if ('scrollBehavior' in document.documentElement.style) {
-      container.scrollTo({ top, behavior: 'smooth' });
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-      container.scrollTop = top;
+      el.scrollIntoView(true);
     }
   }
 }
