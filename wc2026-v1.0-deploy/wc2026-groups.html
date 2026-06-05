@@ -150,7 +150,9 @@ body {
 /* ── Team cell ── */
 .team-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .t-flag { font-size: 1rem; line-height: 1; flex-shrink: 0; }
-.t-name { font-size: 0.9rem; font-weight: 700; color: var(--fg); }
+.t-name    { font-size: 16px; font-weight: 700; color: var(--fg); white-space: nowrap; }
+.t-name.sm { font-size: 13px; }
+.t-name.xs { font-size: 10px; }
 
 /* ── Stats cells ── */
 .rank-cell { color: var(--muted); font-size: 0.83rem; font-weight: 600; }
@@ -308,7 +310,7 @@ function renderGroups(groups) {
           <td class="td-team">
             <div class="team-cell">
               <span class="t-flag">${t.team.flag}</span>
-              <span class="t-name" title="${t.team.name || t.team.code}">${(t.team.name || t.team.code).length > 4 ? (t.team.name || t.team.code).slice(0,4)+'…' : (t.team.name || t.team.code)}</span>
+              <span class="t-name${((t.team.name||t.team.code||'').length>=7?' xs':(t.team.name||t.team.code||'').length>=5?' sm':'')}" title="${t.team.name || t.team.code}">${t.team.name || t.team.code}</span>
             </div>
           </td>
           <td>${t.played}</td>
