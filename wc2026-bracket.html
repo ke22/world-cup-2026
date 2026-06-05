@@ -47,7 +47,7 @@ body {
 /* ── Page ── */
 .page {
   padding: 14px 14px 0;
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1013,13 +1013,13 @@ function renderDesktop(matches) {
         ${innerHtml}
       </div>
       <div class="center-nav">
-        <div class="center-nav-note">點擊按鈕展開</div>
+        <div class="center-nav-note">點擊看更多</div>
         <div class="cnav-btn" data-round="fin" role="button" onclick="mobileToggleRound('fin',this)">決賽</div>
         <div class="cnav-btn" data-round="sf"  role="button" onclick="mobileToggleRound('sf',this)">4強</div>
         <div class="cnav-btn" data-round="qf"  role="button" onclick="mobileToggleRound('qf',this)">8強</div>
         <div class="cnav-btn" data-round="r16" role="button" onclick="mobileToggleRound('r16',this)">16強</div>
         <div class="cnav-btn" data-round="r32" role="button" onclick="mobileToggleRound('r32',this)">32強</div>
-        <div class="seed-legend" style="text-align:center">點擊按鈕展開</div>
+        <div class="seed-legend" style="text-align:center">點擊看更多</div>
       </div>
     </div>`;
   }
@@ -1248,7 +1248,7 @@ function renderMobile(matches, activePhase) {
   </div>`;
 
   return `<div class="mobile-panel">
-    <div class="mobile-nav-note">點擊按鈕展開</div>
+    <div class="mobile-nav-note">點擊看更多</div>
     ${sections}
     <div class="mobile-groups-wrap">
       <div class="mobile-groups-title">分組</div>

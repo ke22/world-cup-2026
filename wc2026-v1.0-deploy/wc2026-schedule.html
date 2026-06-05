@@ -49,7 +49,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 /* ── Wrapper ── */
 .wrapper {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 14px 14px 0;
   min-height: max(100vh, var(--schedule-frame-min-height));
@@ -117,12 +117,20 @@ button { font-family: inherit; cursor: pointer; border: none; }
   transition: background 0.12s;
 }
 @media (hover: hover) { .nav-arrow:hover { background: var(--accent-soft); } }
-.date-tabs { display: flex; flex: 1; justify-content: space-around; overflow: hidden; }
+.date-tabs {
+  display: flex; flex: 1;
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.date-tabs::-webkit-scrollbar { display: none; }
 .date-tab {
   display: flex; flex-direction: column; align-items: center;
   padding: 8px 4px; border-radius: 10px; border: none; background: none;
-  flex: 1; min-width: 0; color: var(--muted);
+  flex: 1 0 calc(100% / 7); min-width: 36px; color: var(--muted);
   transition: background 0.12s, color 0.12s;
+  scroll-snap-align: start;
+  touch-action: manipulation;
 }
 @media (hover: hover) { .date-tab:hover { background: var(--accent-soft); color: var(--fg); } }
 .date-tab.active {
@@ -166,7 +174,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .team {
   display: flex; flex-direction: column; align-items: center;
-  gap: 5px; min-width: 72px; max-width: 90px;
+  gap: 5px; flex: 1; min-width: 0;
 }
 .team-flag { font-size: 1.8rem; line-height: 1; }
 .team-name {
@@ -612,13 +620,13 @@ function renderMatchCard(m) {
     <div class="${cardClass}">
       <div class="card-teams">
         <div class="team">
-          <span class="team-flag">${m.team1.flag}</span>
-          <span class="team-name">${m.team1.name || m.team1.code}</span>
+          ${m.team1.flag ? `<span class="team-flag">${m.team1.flag}</span>` : ''}
+          <span class="team-name">${m.team1.name || m.team1.code || '待定'}</span>
         </div>
         <div class="card-center">${centerHtml}</div>
         <div class="team">
-          <span class="team-flag">${m.team2.flag}</span>
-          <span class="team-name">${m.team2.name || m.team2.code}</span>
+          ${m.team2.flag ? `<span class="team-flag">${m.team2.flag}</span>` : ''}
+          <span class="team-name">${m.team2.name || m.team2.code || '待定'}</span>
         </div>
       </div>
       ${infoLine ? `<div class="card-info">${infoLine}</div>` : ''}
@@ -669,7 +677,7 @@ function renderGroupsGrid(groups) {
         <thead>
           <tr>
             <th>#</th><th>隊伍</th>
-            <th>賽</th><th>勝</th><th>平</th><th>負</th><th>球差</th><th>積分</th>
+            <th>賽</th><th>勝</th><th>平</th><th>負</th><th>淨勝球</th><th>積分</th>
           </tr>
         </thead>
         <tbody>
@@ -750,6 +758,13 @@ async function init() {
     notifyHeight();
     return;
   }
+
+  // Set frame min-height based on the busiest day so the iframe never shrinks
+  const countByDate = {};
+  allMatches.forEach(m => { countByDate[m.date] = (countByDate[m.date] || 0) + 1; });
+  const maxPerDay = Math.max(...Object.values(countByDate), 1);
+  const dynMinH = maxPerDay * 130 + 210; // ~130px/card + fixed chrome
+  document.documentElement.style.setProperty('--schedule-frame-min-height', dynMinH + 'px');
 
   activeDate = findInitialDate();
   setWindowForDate(activeDate);
