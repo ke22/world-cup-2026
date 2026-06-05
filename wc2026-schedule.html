@@ -119,18 +119,13 @@ button { font-family: inherit; cursor: pointer; border: none; }
 @media (hover: hover) { .nav-arrow:hover { background: var(--accent-soft); } }
 .date-tabs {
   display: flex; flex: 1;
-  overflow-x: auto; scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  -ms-overflow-style: none; scrollbar-width: none;
+  overflow: hidden;
 }
-.date-tabs::-webkit-scrollbar { display: none; }
 .date-tab {
   display: flex; flex-direction: column; align-items: center;
   padding: 8px 4px; border-radius: 10px; border: none; background: none;
-  flex: 1 0 calc(100% / 7); min-width: 36px; color: var(--muted);
+  flex: 1; min-width: 0; color: var(--muted);
   transition: background 0.12s, color 0.12s;
-  scroll-snap-align: start;
-  touch-action: manipulation;
 }
 @media (hover: hover) { .date-tab:hover { background: var(--accent-soft); color: var(--fg); } }
 .date-tab.active {
@@ -554,14 +549,21 @@ function renderDateNav() {
   document.getElementById('nav-prev').addEventListener('click', () => shiftWindow(-7));
   document.getElementById('nav-next').addEventListener('click', () => shiftWindow(7));
 
-  // Swipe left/right on date-tabs to navigate weeks
-  const tabsEl = nav.querySelector('.date-tabs');
-  let swipeX = 0;
-  tabsEl.addEventListener('touchstart', e => { swipeX = e.touches[0].clientX; }, { passive: true });
-  tabsEl.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - swipeX;
-    if (Math.abs(dx) > 50) shiftWindow(dx > 0 ? -7 : 7);
-  }, { passive: true });
+  // Swipe left/right on date-nav to navigate weeks
+  let swipeX = 0, swipeY = 0, swiping = false;
+  nav.addEventListener('pointerdown', e => {
+    swipeX = e.clientX; swipeY = e.clientY; swiping = true;
+  });
+  nav.addEventListener('pointerup', e => {
+    if (!swiping) return;
+    swiping = false;
+    const dx = e.clientX - swipeX;
+    const dy = e.clientY - swipeY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      shiftWindow(dx > 0 ? -7 : 7);
+    }
+  });
+  nav.addEventListener('pointercancel', () => { swiping = false; });
 
   scrollToActiveTab();
 }
