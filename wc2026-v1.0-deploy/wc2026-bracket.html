@@ -1071,11 +1071,10 @@ function mobileCenterScroll() {
 function notifyHeight() {}
 
 try {
-  new ResizeObserver(entries => {
-    window.parent.postMessage(
-      { type: 'wc2026-resize', height: Math.ceil(entries[0].contentRect.height) },
-      '*'
-    );
+  new ResizeObserver(() => {
+    const el = document.querySelector('.page');
+    const h = el ? el.offsetTop + el.offsetHeight : document.body.offsetHeight;
+    window.parent.postMessage({ type: 'wc2026-resize', height: Math.ceil(h) }, '*');
   }).observe(document.body);
 } catch {}
 
