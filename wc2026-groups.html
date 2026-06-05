@@ -348,14 +348,16 @@ function renderGroups(groups) {
   }).join('');
 }
 
-function notifyHeight() {
-  try {
+function notifyHeight() {}
+
+try {
+  new ResizeObserver(() => {
     window.parent.postMessage(
       { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
       '*'
     );
-  } catch {}
-}
+  }).observe(document.body);
+} catch {}
 
 async function init() {
   if (!GAS_URL) {

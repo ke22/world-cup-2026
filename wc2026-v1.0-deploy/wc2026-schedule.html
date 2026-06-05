@@ -717,16 +717,15 @@ function selectDate(ymd) {
 
 // ─── postMessage height ───────────────────────
 
-function notifyHeight() {
-  try {
+function notifyHeight() {} // kept for compatibility — ResizeObserver handles this
+
+try {
+  new ResizeObserver(() => {
     const minHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--schedule-frame-min-height'), 10) || 847;
     const height = Math.max(document.documentElement.scrollHeight, minHeight);
-    window.parent.postMessage(
-      { type: 'wc2026-resize', height },
-      '*'
-    );
-  } catch {}
-}
+    window.parent.postMessage({ type: 'wc2026-resize', height }, '*');
+  }).observe(document.body);
+} catch {}
 
 // ─── Init ─────────────────────────────────────
 

@@ -1069,14 +1069,16 @@ function mobileCenterScroll() {
   outer.scrollLeft = Math.max(0, (inner.offsetWidth - outer.clientWidth) / 2);
 }
 
-function notifyHeight() {
-  try {
+function notifyHeight() {}
+
+try {
+  new ResizeObserver(() => {
     window.parent.postMessage(
       { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
       '*'
     );
-  } catch {}
-}
+  }).observe(document.body);
+} catch {}
 
 function fitBracket() {
   const inner = document.querySelector('.bracket-inner');
