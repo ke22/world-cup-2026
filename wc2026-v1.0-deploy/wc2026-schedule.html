@@ -281,7 +281,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .group-table .rank { color: var(--muted); font-size: 11px; }
 .group-table .team-cell { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .group-table .t-flag { font-size: 14px; flex-shrink: 0; }
-.group-table .t-name { font-size: 11px; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-table .t-name    { font-size: 11px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+.group-table .t-name.sm { font-size: 9px; }
+.group-table .t-name.xs { font-size: 7.5px; }
 .group-table .pts-cell { font-weight: 800; color: var(--accent); }
 
 img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
@@ -703,7 +705,7 @@ function renderGroupsGrid(groups) {
               <td>
                 <div class="team-cell">
                   <span class="t-flag">${t.team.flag}</span>
-                  <span class="t-name">${t.team.name || t.team.code}</span>
+                  <span class="t-name${((t.team.name||t.team.code||'').length>=7?' xs':(t.team.name||t.team.code||'').length>=5?' sm':'')}">${t.team.name || t.team.code}</span>
                 </div>
               </td>
               <td>${t.played}</td>
