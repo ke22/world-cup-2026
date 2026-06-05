@@ -715,8 +715,8 @@ function selectDate(ymd) {
 function notifyHeight() {} // kept for compatibility — ResizeObserver handles this
 
 try {
-  new ResizeObserver(() => {
-    window.parent.postMessage({ type: 'wc2026-resize', height: document.documentElement.scrollHeight }, '*');
+  new ResizeObserver(entries => {
+    window.parent.postMessage({ type: 'wc2026-resize', height: Math.ceil(entries[0].contentRect.height) }, '*');
   }).observe(document.body);
 } catch {}
 

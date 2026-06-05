@@ -348,9 +348,9 @@ function renderGroups(groups) {
 function notifyHeight() {}
 
 try {
-  new ResizeObserver(() => {
+  new ResizeObserver(entries => {
     window.parent.postMessage(
-      { type: 'wc2026-resize', height: document.documentElement.scrollHeight },
+      { type: 'wc2026-resize', height: Math.ceil(entries[0].contentRect.height) },
       '*'
     );
   }).observe(document.body);
