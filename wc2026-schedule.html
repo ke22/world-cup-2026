@@ -111,13 +111,16 @@ button { font-family: inherit; cursor: pointer; border: none; }
   overflow: hidden; /* ensure no overflow */
 }
 .date-tabs {
-  display: flex; flex: 1;
-  overflow: hidden;
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none; scrollbar-width: none;
 }
+.date-tabs::-webkit-scrollbar { display: none; }
 .date-tab {
   display: flex; flex-direction: column; align-items: center;
-  padding: 8px 4px; border-radius: 10px; border: none; background: none;
-  flex: 1; min-width: 0; color: var(--muted);
+  padding: 8px 6px; border-radius: 10px; border: none; background: none;
+  flex: 0 0 44px; color: var(--muted);
   transition: background 0.12s, color 0.12s;
 }
 @media (hover: hover) { .date-tab:hover { background: var(--accent-soft); color: var(--fg); } }
@@ -487,72 +490,31 @@ function renderDateNav() {
   if (!nav) return;
   const matchDates = getMatchDateSet();
 
-  const tabs = Array.from({ length: 7 }, (_, i) => {
-    const d        = addDays(windowStart, i);
-    const ymd      = toYMD(d);
-    const wd       = WEEKDAYS[d.getDay()];
-    const dayNum   = d.getDate();
-    const month    = d.getMonth() + 1;
-    const hasMatch = matchDates.has(ymd);
-    const isActive = ymd === activeDate;
-    return { ymd, wd, dayNum, month, hasMatch, isActive };
-  });
+  // All match dates sorted
+  const allDates = [...matchDates].sort();
+  let prevMonth = null;
 
-  // Determine month display strategy
-  const uniqueMonths = [...new Set(tabs.map(t => t.month))];
-  const isCrossMonth = uniqueMonths.length > 1;
+  const tabsHtml = allDates.map(ymd => {
+    const d      = parseYMD(ymd);
+    const month  = d.getMonth() + 1;
+    const showM  = month !== prevMonth;
+    prevMonth    = month;
+    return `
+      <button class="date-tab${ymd === activeDate ? ' active' : ''}"
+              data-date="${ymd}" role="tab"
+              aria-selected="${ymd === activeDate}" aria-label="${ymd}">
+        <span class="month-label">${showM ? `${month}月` : ''}</span>
+        <span class="wd">${WEEKDAYS[d.getDay()]}</span>
+        <span class="dy">${d.getDate()}</span>
+        ${matchDates.has(ymd) ? '<span class="dot"></span>' : '<span class="dot-placeholder"></span>'}
+      </button>`;
+  }).join('');
 
-  // When cross-month: mark tabs that start a new month (i > 0)
-  const showMonthAt = new Set();
-  if (isCrossMonth) {
-    let prev = tabs[0].month;
-    for (let i = 1; i < tabs.length; i++) {
-      if (tabs[i].month !== prev) { showMonthAt.add(i); prev = tabs[i].month; }
-    }
-  }
-
-  // Single-month: show month name beside left arrow
-  const singleMonthHtml = !isCrossMonth
-    ? `<span class="date-nav-month">${tabs[0].month}月</span>`
-    : '';
-
-  nav.innerHTML = `
-    ${singleMonthHtml}
-    <div class="date-tabs" role="tablist">
-      ${tabs.map(({ ymd, wd, dayNum, month, hasMatch, isActive }, i) => `
-        <button class="date-tab${isActive ? ' active' : ''}"
-                data-date="${ymd}"
-                role="tab"
-                aria-selected="${isActive}"
-                aria-label="${ymd}">
-          <span class="month-label">${showMonthAt.has(i) ? `${month}月` : ''}</span>
-          <span class="wd">${wd}</span>
-          <span class="dy">${dayNum}</span>
-          ${hasMatch ? '<span class="dot"></span>' : '<span class="dot-placeholder"></span>'}
-        </button>
-      `).join('')}
-    </div>
-  `;
+  nav.innerHTML = `<div class="date-tabs" role="tablist">${tabsHtml}</div>`;
 
   nav.querySelectorAll('.date-tab').forEach(btn =>
     btn.addEventListener('click', () => selectDate(btn.dataset.date))
   );
-
-  // Swipe left/right on date-nav to navigate weeks
-  let swipeX = 0, swipeY = 0, swiping = false;
-  nav.addEventListener('pointerdown', e => {
-    swipeX = e.clientX; swipeY = e.clientY; swiping = true;
-  });
-  nav.addEventListener('pointerup', e => {
-    if (!swiping) return;
-    swiping = false;
-    const dx = e.clientX - swipeX;
-    const dy = e.clientY - swipeY;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      shiftWindow(dx > 0 ? -7 : 7);
-    }
-  });
-  nav.addEventListener('pointercancel', () => { swiping = false; });
 
   scrollToActiveTab();
 }
