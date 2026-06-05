@@ -941,7 +941,7 @@ function renderDesktop(matches) {
   const rightGroups = 'GHIJKL'.split('');
 
   const legendHtml = `<div class="seed-legend">
-    <strong>賽程代號說明：</strong>各組前 2 名直接晉級；「3名(CDFGH)」= 12 組第 3 名互比，取最佳 8 支，出線組別賽後確定（目前顯示「待定」）
+    ※小組賽積分前 2 名確定晉級；12 個小組中積分第 3 名隊伍互比，其中前 8 名晉級，先以「待定」表示
   </div>`;
 
   const mobile = window.innerWidth < 660;
@@ -1248,7 +1248,7 @@ function renderMobile(matches, activePhase) {
   const groupBoxes = 'ABCDEFGHIJKL'.split('').map(l => groupBox(l,'sm')).join('');
 
   const legendHtml = `<div class="mobile-seed-legend">
-    <strong>代號說明：</strong>各組前 2 名直接晉級；「3名(CDFGH)」= 12 組第 3 名互比，取最佳 8 支（出線組別賽後確定，目前顯示「待定」）
+    ※小組賽積分前 2 名確定晉級；12 個小組中積分第 3 名隊伍互比，其中前 8 名晉級，先以「待定」表示
   </div>`;
 
   return `<div class="mobile-panel">
