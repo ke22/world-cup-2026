@@ -63,44 +63,44 @@ button:hover { background: #eef2f6; }
 <body>
 
 <h1>CNA Embed Test — World Cup 2026 Charts</h1>
-<p class="subtitle">監聽 <code>wc2026-resize</code> postMessage 並動態調整 iframe 高度。賽程初始高度 847px，其餘圖表初始高度 300px，收到訊息後自動撐開。</p>
+<p class="subtitle">監聽 <code>wc2026-resize</code> postMessage 並動態調整 iframe 高度。小組積分初始高度 430px，其餘圖表初始高度 800px。</p>
 
 <div class="embed-block">
   <div class="embed-label">
     📅 wc2026-schedule.html (Mobile 375px)
-    <span class="height-badge" id="h-schedule">height: 847px</span>
+    <span class="height-badge" id="h-schedule">height: 800px</span>
   </div>
-  <iframe id="frame-schedule" src="wc2026-schedule.html" title="賽程" style="height:847px"></iframe>
+  <iframe id="frame-schedule" src="wc2026-schedule.html" title="賽程"></iframe>
   <div class="controls">
     <button onclick="setWidth('frame-schedule', 375)">375px (Mobile)</button>
     <button onclick="setWidth('frame-schedule', 900)" class="pc">900px (PC)</button>
-    <button onclick="resetHeight('frame-schedule')">Reset 847px</button>
+    <button onclick="resetHeight('frame-schedule')">Reset 800px</button>
   </div>
 </div>
 
 <div class="embed-block">
   <div class="embed-label">
     🏆 wc2026-groups.html (Mobile 375px)
-    <span class="height-badge" id="h-groups">height: 300px</span>
+    <span class="height-badge" id="h-groups">height: 430px</span>
   </div>
-  <iframe id="frame-groups" src="wc2026-groups.html" title="積分榜"></iframe>
+  <iframe id="frame-groups" src="wc2026-groups.html" title="積分榜" style="height:430px"></iframe>
   <div class="controls">
     <button onclick="setWidth('frame-groups', 375)">375px (Mobile)</button>
     <button onclick="setWidth('frame-groups', 900)">900px (PC)</button>
-    <button onclick="resetHeight('frame-groups')">Reset 300px</button>
+    <button onclick="resetHeight('frame-groups')">Reset 430px</button>
   </div>
 </div>
 
 <div class="embed-block">
   <div class="embed-label">
     🌳 wc2026-bracket.html (Mobile 375px)
-    <span class="height-badge" id="h-bracket">height: 300px</span>
+    <span class="height-badge" id="h-bracket">height: 800px</span>
   </div>
   <iframe id="frame-bracket" src="wc2026-bracket.html" title="賽程樹"></iframe>
   <div class="controls">
     <button onclick="setWidth('frame-bracket', 375)">375px (Mobile)</button>
     <button onclick="setWidth('frame-bracket', 900)">900px (PC)</button>
-    <button onclick="resetHeight('frame-bracket')">Reset 300px</button>
+    <button onclick="resetHeight('frame-bracket')">Reset 800px</button>
   </div>
 </div>
 
@@ -111,9 +111,9 @@ button:hover { background: #eef2f6; }
 
 <script>
 const frameMap = {
-  'frame-schedule': { badgeId: 'h-schedule', minHeight: 847 },
-  'frame-groups':   { badgeId: 'h-groups',   minHeight: 300 },
-  'frame-bracket':  { badgeId: 'h-bracket',  minHeight: 300 },
+  'frame-schedule': { badgeId: 'h-schedule', minHeight: 800 },
+  'frame-groups':   { badgeId: 'h-groups',   minHeight: 430 },
+  'frame-bracket':  { badgeId: 'h-bracket',  minHeight: 800 },
 };
 
 window.addEventListener('message', e => {

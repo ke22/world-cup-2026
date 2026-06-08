@@ -340,10 +340,18 @@ function renderGroups(groups) {
 
 function notifyHeight() {}
 
+function getEmbedHeight() {
+  const firstGroup = document.querySelector('.group-section');
+  if (!firstGroup) return document.body.offsetHeight;
+  const container = document.getElementById('groups-container');
+  const containerStyle = container ? getComputedStyle(container) : null;
+  const bottomPadding = containerStyle ? parseFloat(containerStyle.paddingBottom) || 0 : 0;
+  return Math.ceil(firstGroup.getBoundingClientRect().bottom + window.scrollY + bottomPadding);
+}
+
 try {
   new ResizeObserver(() => {
-    const el = document.querySelector('.page');
-    const h = el ? el.offsetTop + el.offsetHeight : document.body.offsetHeight;
+    const h = getEmbedHeight();
     window.parent.postMessage({ type: 'wc2026-resize', height: Math.ceil(h) }, '*');
   }).observe(document.body);
 } catch {}

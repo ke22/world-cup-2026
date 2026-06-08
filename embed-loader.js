@@ -21,8 +21,8 @@
     iframe.loading          = 'lazy';
     iframe.referrerPolicy   = 'strict-origin-when-cross-origin';
     iframe.setAttribute('frameborder', '0');
-    iframe.setAttribute('scrolling', 'no');
-    iframe.style.cssText    = 'width:100%;border:0;display:block;';
+    iframe.setAttribute('scrolling', 'yes');
+    iframe.style.cssText    = 'width:100%;border:0;display:block;overflow:auto;';
     return iframe;
   }
 

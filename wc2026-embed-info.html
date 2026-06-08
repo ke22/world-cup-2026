@@ -177,7 +177,7 @@ footer {
     <div class="card-body">
       <div class="card-meta">
         <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
-        <div class="card-meta-item">初始高度：<strong>600px（自動撐高）</strong></div>
+        <div class="card-meta-item">初始高度：<strong>430px（顯示一組）</strong></div>
         <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
       </div>
       <div class="section-title">嵌入代碼</div>
@@ -198,7 +198,7 @@ footer {
     <div class="card-body">
       <div class="card-meta">
         <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
-        <div class="card-meta-item">初始高度：<strong>600px（自動撐高）</strong></div>
+        <div class="card-meta-item">初始高度：<strong>800px（自動撐高）</strong></div>
         <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
       </div>
       <div class="section-title">嵌入代碼</div>
@@ -219,7 +219,7 @@ footer {
     <div class="card-body">
       <div class="card-meta">
         <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
-        <div class="card-meta-item">初始高度：<strong>600px（自動撐高）</strong></div>
+        <div class="card-meta-item">初始高度：<strong>800px（自動撐高）</strong></div>
         <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
       </div>
       <div class="section-title">嵌入代碼</div>
@@ -236,7 +236,7 @@ footer {
     <strong>⚡ 自動高度調整說明</strong><br>
     以上嵌入代碼已內含 <code>postMessage</code> 監聽腳本。圖表載入後會自動傳送實際高度，
     iframe 會自動撐高至完整內容高度，不需手動設定固定高度。<br><br>
-    若 CNA CMS 不支援內嵌 script，可改用固定高度版本（移除 &lt;script&gt; 區塊，將 height 設為 800）。
+    若 CNA CMS 不支援內嵌 script，可改用固定高度版本（移除 &lt;script&gt; 區塊，依各圖表建議高度設定）。
   </div>
 
   <footer>
@@ -248,8 +248,8 @@ footer {
 <script>
 const CHARTS = [
   { id: 'schedule', file: 'wc2026-schedule.html', title: '世界盃每日賽程',   height: 800 },
-  { id: 'groups',   file: 'wc2026-groups.html',   title: '世界盃小組積分',   height: 600 },
-  { id: 'bracket',  file: 'wc2026-bracket.html',  title: '世界盃淘汰賽賽程樹', height: 620 },
+  { id: 'groups',   file: 'wc2026-groups.html',   title: '世界盃小組積分',   height: 430 },
+  { id: 'bracket',  file: 'wc2026-bracket.html',  title: '世界盃淘汰賽賽程樹', height: 800 },
 ];
 
 function buildCode(baseUrl, chart) {

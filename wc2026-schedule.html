@@ -91,10 +91,8 @@ button { font-family: inherit; cursor: pointer; border: none; }
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
 }
-.btn-action.test { border-color: rgba(255,180,120,0.5); color: #ffd4a8; }
 @media (hover: hover) {
   .btn-action:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.55); }
-  .btn-action.test:hover { background: rgba(255,140,60,0.18); }
 }
 
 /* ── Date nav ── */
@@ -468,26 +466,12 @@ function renderShell() {
     <div class="header">
       <span class="header-title">世界盃每日賽程</span>
       <div class="header-actions">
-        <button class="btn-action test" id="btn-test" style="display:none">測試比分</button>
         <img src="cna_logo.svg" class="cna-logo" alt="CNA">
       </div>
     </div>
     <div class="date-nav" id="date-nav"></div>
     <div class="match-list" id="match-list"></div>
   `;
-  document.getElementById('btn-test').addEventListener('click', () => {
-    if (!allMatches.length) return;
-    const m = allMatches[0];
-    const wasFinished = m.status === 'finished';
-    m.status = wasFinished ? 'upcoming' : 'finished';
-    m.score1 = wasFinished ? null : 2;
-    m.score2 = wasFinished ? null : 1;
-    activeDate = m.date;
-    setWindowForDate(activeDate);
-    renderDateNav();
-    renderMatches();
-    notifyHeight();
-  });
 }
 
 // ─── Render: date nav ─────────────────────────
