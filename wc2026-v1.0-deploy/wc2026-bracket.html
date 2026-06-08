@@ -257,8 +257,8 @@ body {
 }
 .gb-flag { font-size: 0.75rem; flex-shrink: 0; line-height: 1; }
 .gb-name    { font-size: 0.55rem; font-weight: 600; color: var(--fg); min-width: 0; white-space: nowrap; }
-.gb-name.sm { font-size: 0.46rem; }
-.gb-name.xs { font-size: 0.38rem; }
+.gb-name.sm { font-size: 0.46rem; white-space: normal; line-height: 1.2; }
+.gb-name.xs { font-size: 0.38rem; white-space: normal; line-height: 1.2; }
 
 /* ── Round column ── */
 .round-col {
@@ -719,7 +719,7 @@ const GROUPS_INFO = {
   D: { color: '#1565c0', teams: [['🇺🇸','美國'],['🇵🇾','巴拉圭'],['🇦🇺','澳洲'],['🇹🇷','土耳其']] },
   E: { color: '#7b1fa2', teams: [['🇩🇪','德國'],['🇨🇮','象牙海岸'],['🇪🇨','厄瓜多'],['🇨🇼','庫拉索']] },
   F: { color: '#aeea00', teams: [['🇳🇱','荷蘭'],['🇯🇵','日本'],['🇸🇪','瑞典'],['🇹🇳','突尼西亞']] },
-  G: { color: '#ff1493', teams: [['🇪🇸','西班牙'],['🇨🇻','維德角'],['🇸🇦','沙烏地'],['🇺🇾','烏拉圭']] },
+  G: { color: '#ff1493', teams: [['🇪🇸','西班牙'],['🇨🇻','維德角'],['🇸🇦','沙烏地阿拉伯'],['🇺🇾','烏拉圭']] },
   H: { color: '#00e5d4', teams: [['🇧🇪','比利時'],['🇪🇬','埃及'],['🇮🇷','伊朗'],['🇳🇿','紐西蘭']] },
   I: { color: '#9c27b0', teams: [['🇦🇷','阿根廷'],['🇩🇿','阿爾及利亞'],['🇦🇹','奧地利'],['🇯🇴','約旦']] },
   J: { color: '#00897b', teams: [['🇫🇷','法國'],['🇸🇳','塞內加爾'],['🇮🇶','伊拉克'],['🇳🇴','挪威']] },
@@ -782,7 +782,7 @@ async function fetchAllMatches() {
 
 /* ── Phase helpers ─────────────────────────────── */
 function isTBD(t) { return !t.code && !t.name; }
-const TEAM_NAMES = { '波士尼亞': '波赫', '剛果': '民主剛果', '沙烏地阿拉伯': '沙烏地' };
+const TEAM_NAMES = { '波士尼亞': '波赫', '剛果': '民主剛果' };
 function teamName(t) { const n = t.name || t.code || ''; return TEAM_NAMES[n] || n; }
 
 function isAllTBD(ms)  { return ms.length > 0 && ms.every(m => isTBD(m.team1) && isTBD(m.team2)); }
