@@ -100,7 +100,31 @@ Playwright 在 `click()` 前會先 scroll 元素進視窗，這個 scroll 本身
 
 ---
 
-## 10. embed-loader.js 架構
+## 10. `overflow: visible` 子元素無法穿透父層的 `overflow: hidden`
+
+**問題**：`.group-box { overflow: hidden }` 包著 `.gb-name { overflow: hidden }`。想透過 `.gb-name.xs { overflow: visible }` 讓文字不被 gb-name 自身裁切，結果「沒變化」。
+
+**原因**：CSS 規範明定：當父元素 `overflow` 為非 `visible` 時，子元素的 `overflow: visible` 會被強制視為 `overflow: auto`。換言之，子元素永遠無法「穿透」父層的 `overflow: hidden` 讓內容溢出至父層外部。
+
+**解法**：改用 `white-space: normal` 讓文字換行，徹底消除橫向溢出，不再需要依賴 overflow 穿透。
+
+---
+
+## 11. 窄容器 CJK 文字：用 `<br>` 注入控制換行位置
+
+**問題**：`white-space: normal` 讓瀏覽器自行決定換行點，「沙烏地阿拉伯」（6 字）可能斷成「沙烏地阿 / 拉伯」（4+2），視覺上不對稱。
+
+**解法**：在 JS 渲染時，於第 3 字後插入 `<br>` 強制對半斷行：
+
+```javascript
+const dn = nc === ' xs' ? name.slice(0, 3) + '<br>' + name.slice(3) : name;
+```
+
+結果固定為「沙烏地 / 阿拉伯」（3+3），`title` 屬性保留完整原名供 hover 顯示。適用於所有 ≥ 6 字的隊名（xs class）。
+
+---
+
+## 13. embed-loader.js 架構
 
 CNA 要求使用 `data-src` lazy-load 模式。`embed-loader.js`：
 1. 找所有 `.wc2026-embed[data-src]` div
