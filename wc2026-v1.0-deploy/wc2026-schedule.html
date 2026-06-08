@@ -364,22 +364,22 @@ function formatDateLabel(ymd) {
   return `${m}月${day}日（${wd}）`;
 }
 
-// ─── sessionStorage cache ─────────────────────
+// ─── localStorage cache ───────────────────────
 
 function cacheGet(key) {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts < CACHE_TTL * 1000) return data;
-    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
     return null;
   } catch { return null; }
 }
 
 function cacheSet(key, data) {
   try {
-    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
   } catch {}
 }
 
@@ -561,9 +561,11 @@ function renderMatchCard(m) {
   let centerHtml = '';
   let cardClass  = 'match-card';
 
-  if (m.status === 'finished') {
+  const hasScore = m.score1 !== null && m.score2 !== null;
+
+  if (m.status === 'finished' && hasScore) {
     centerHtml = `<div class="score-finished">${m.score1}&thinsp;:&thinsp;${m.score2}</div>`;
-  } else if (m.status === 'live') {
+  } else if (m.status === 'live' && hasScore) {
     cardClass += ' live';
     centerHtml = `
       <div class="live-badge"><span class="live-dot"></span>LIVE</div>
@@ -721,26 +723,46 @@ async function init() {
     return;
   }
 
-  app.innerHTML = '<div class="state-msg">載入賽程資料中…</div>';
-  notifyHeight();
-
-  try {
-    allMatches = await fetchAllMatches(false);
-  } catch {
-    app.innerHTML = '<div class="state-msg state-error">資料載入失敗，請稍後重試</div>';
+  // Render from cache immediately (shows kickoff times before API responds)
+  const cached = cacheGet('wc26_all');
+  if (cached) {
+    allMatches = cached;
+    activeDate = findInitialDate();
+    setWindowForDate(activeDate);
+    renderShell();
+    renderDateNav();
+    renderMatches();
     notifyHeight();
-    return;
+  } else {
+    app.innerHTML = '<div class="state-msg">載入賽程資料中…</div>';
+    notifyHeight();
   }
 
-  // Set frame min-height based on the busiest day so the iframe never shrinks
+  // Fetch fresh data in background; re-render only if scores changed
+  try {
+    const fresh = await fetchAllMatches(true);
+    const changed = JSON.stringify(fresh) !== JSON.stringify(allMatches);
+    allMatches = fresh;
+    if (!cached || changed) {
+      if (!cached) {
+        activeDate = findInitialDate();
+        setWindowForDate(activeDate);
+        renderShell();
+        renderDateNav();
+      }
+      renderMatches();
+      notifyHeight();
+    }
+  } catch {
+    if (!cached) {
+      app.innerHTML = '<div class="state-msg state-error">資料載入失敗，請稍後重試</div>';
+      notifyHeight();
+      return;
+    }
+    // Cache is shown — silently ignore network failure
+  }
 
-  activeDate = findInitialDate();
-  setWindowForDate(activeDate);
-  renderShell();
-  renderDateNav();
-  renderMatches();
   startLiveRefresh();
-  notifyHeight();
 }
 
 // ─── Event listeners ──────────────────────────

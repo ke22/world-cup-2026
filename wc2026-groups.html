@@ -87,9 +87,13 @@ body {
   font-family: inherit;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-@media (hover: hover) { .anchor-btn:hover {
+.anchor-btn.active {
   background: var(--accent);
   color: #fff;
+  border-color: var(--accent);
+}
+@media (hover: hover) { .anchor-btn:not(.active):hover {
+  background: var(--accent-soft);
   border-color: var(--accent);
 } }
 
@@ -106,10 +110,11 @@ body {
 
 /* ── Group section ── */
 .group-section {
-  margin-bottom: 22px;
-  scroll-margin-top: 62px; /* anchor-nav sticky height */
+  display: none;
 }
-.group-section:last-child { margin-bottom: 0; }
+.group-section.active {
+  display: block;
+}
 
 /* ── Group card ── */
 .group-card {
@@ -184,7 +189,6 @@ body {
     flex: 1 1 0;
     min-width: 0;
   }
-  .group-section { scroll-margin-top: 52px; }
   .groups-container { min-height: unset; }
 }
 
@@ -251,20 +255,21 @@ async function fetchGroups() {
 
 function renderAnchorNav(groupKeys) {
   const nav = document.getElementById('anchor-nav');
-  nav.innerHTML = groupKeys.map(g =>
-    `<button class="anchor-btn" onclick="scrollToGroup('${g}')" aria-label="跳至 ${g} 組">${g}</button>`
+  nav.innerHTML = groupKeys.map((g, i) =>
+    `<button class="anchor-btn${i === 0 ? ' active' : ''}" onclick="showGroup('${g}')" aria-label="${g} 組" data-group="${g}">${g}</button>`
   ).join('');
 }
 
-function scrollToGroup(letter) {
-  const el = document.getElementById(`group-${letter}`);
-  if (el) {
-    if ('scrollBehavior' in document.documentElement.style) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      el.scrollIntoView(true);
-    }
-  }
+function showGroup(letter) {
+  // Switch active tab button
+  document.querySelectorAll('.anchor-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.group === letter);
+  });
+  // Show only the selected group section
+  document.querySelectorAll('.group-section').forEach(s => {
+    s.classList.toggle('active', s.id === `group-${letter}`);
+  });
+  notifyHeight();
 }
 
 function gdDisplay(gd) {
@@ -290,7 +295,7 @@ function renderGroups(groups) {
 
   renderAnchorNav(groupKeys);
 
-  document.getElementById('groups-container').innerHTML = groupKeys.map(g => {
+  document.getElementById('groups-container').innerHTML = groupKeys.map((g, i) => {
     const teams = byGroup[g];
     const rows = teams.map((t, i) => {
       const { text: gdText, cls: gdCls } = gdDisplay(t.gd);
@@ -314,7 +319,7 @@ function renderGroups(groups) {
     }).join('');
 
     return `
-      <section class="group-section" id="group-${g}">
+      <section class="group-section${i === 0 ? ' active' : ''}" id="group-${g}">
         <div class="group-card">
           <div class="group-card-title">${g} 組</div>
           <div class="group-table-wrap"><table class="group-table" aria-label="${g} 組積分">
@@ -341,18 +346,17 @@ function renderGroups(groups) {
 function notifyHeight() {}
 
 function getEmbedHeight() {
-  const firstGroup = document.querySelector('.group-section');
-  if (!firstGroup) return document.body.offsetHeight;
-  const container = document.getElementById('groups-container');
-  const containerStyle = container ? getComputedStyle(container) : null;
-  const bottomPadding = containerStyle ? parseFloat(containerStyle.paddingBottom) || 0 : 0;
-  return Math.ceil(firstGroup.getBoundingClientRect().bottom + window.scrollY + bottomPadding);
+  return document.documentElement.scrollHeight;
 }
 
 try {
+  let lastHeight = 0;
   new ResizeObserver(() => {
-    const h = getEmbedHeight();
-    window.parent.postMessage({ type: 'wc2026-resize', height: Math.ceil(h) }, '*');
+    const h = Math.ceil(getEmbedHeight());
+    if (h !== lastHeight) {
+      lastHeight = h;
+      window.parent.postMessage({ type: 'wc2026-resize', height: h }, '*');
+    }
   }).observe(document.body);
 } catch {}
 

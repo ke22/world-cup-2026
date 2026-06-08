@@ -3,166 +3,210 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CNA Embed Test — wc2026 charts</title>
+<title>CNA 模擬頁 — WC2026 圖表嵌入測試</title>
 <style>
+/* ── CNA-like page shell ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: system-ui, sans-serif;
-  background: #f0f4f8;
-  margin: 0;
-  padding: 20px;
-  color: #1f2937;
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+               ui-sans-serif, system-ui, Arial, sans-serif;
+  background: #f4f4f4;
+  color: #222;
+  font-size: 16px;
+  line-height: 1.7;
 }
-h1 { font-size: 18px; margin-bottom: 4px; }
-.subtitle { font-size: 13px; color: #66758a; margin-bottom: 24px; }
-.embed-block {
+
+/* nav bar */
+.cna-nav {
+  background: #c00;
+  padding: 0 20px;
+  height: 48px;
+  display: flex; align-items: center; gap: 12px;
+}
+.cna-nav-logo {
+  color: #fff; font-weight: 900; font-size: 20px; letter-spacing: 1px;
+}
+.cna-nav-label {
+  color: rgba(255,255,255,0.7); font-size: 13px;
+}
+
+/* article container — resizeable to simulate viewport */
+#article-shell {
+  max-width: 800px;
+  margin: 0 auto;
+  transition: max-width 0.25s ease;
+}
+
+/* article body */
+.article-wrap {
   background: #fff;
-  border: 1px solid #dde3ec;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  padding: 28px 20px 48px;
 }
-.embed-label {
-  font-size: 13px; font-weight: 700; color: #0f4b8f;
-  margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+.article-category { font-size: 12px; color: #c00; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
+.article-headline {
+  font-size: 24px; font-weight: 900; line-height: 1.35;
+  margin-bottom: 12px; color: #111;
 }
-.embed-label .height-badge {
-  font-size: 11px; font-weight: 400; color: #66758a;
-  background: #eef2f6; padding: 2px 8px; border-radius: 20px;
+.article-meta { font-size: 13px; color: #888; margin-bottom: 20px; }
+.article-body p { margin-bottom: 16px; color: #333; font-size: 15px; }
+.article-body .chart-label {
+  font-size: 12px; color: #888; text-align: center;
+  margin-top: 6px; margin-bottom: 24px;
 }
-iframe {
+
+/* wc2026-embed placeholder while loading */
+.wc2026-embed {
+  background: #f0f4f8;
+  min-height: 300px;
+  margin: 20px 0 4px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.wc2026-embed iframe {
+  width: 100% !important;
+  border: 0;
   display: block;
-  width: 800px;
-  height: 800px;
-  border: 2px dashed #c9d6e3;
-  border-radius: 8px;
   transition: height 0.3s ease;
 }
-iframe.pc { width: 800px; }
-.controls {
-  margin-top: 8px;
-  display: flex; gap: 8px; flex-wrap: wrap;
+
+/* ── dev toolbar (not part of real CNA page) ── */
+.dev-bar {
+  background: #1e2a38;
+  padding: 10px 16px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
 }
-button {
-  font-size: 12px; padding: 4px 10px;
-  border: 1px solid #c9d6e3; border-radius: 6px;
-  background: #fff; cursor: pointer; color: #0f4b8f;
+.dev-bar-title { color: #a8c4e0; font-size: 12px; font-family: monospace; margin-right: 4px; }
+.dev-btn {
+  font-size: 11px; padding: 3px 10px;
+  border: 1px solid #3a5068; border-radius: 4px;
+  background: #263749; cursor: pointer; color: #a8c4e0;
+  font-family: monospace;
 }
-button:hover { background: #eef2f6; }
+.dev-btn:hover { background: #304a62; }
+.dev-btn.active { background: #0f4b8f; border-color: #2c73c9; color: #fff; }
 .log-panel {
-  background: #1e2a38; border-radius: 8px; padding: 12px;
-  margin-top: 20px; max-height: 200px; overflow-y: auto;
-  font-family: monospace; font-size: 12px; color: #a8c4e0;
+  background: #111a24; padding: 8px 14px;
+  max-height: 140px; overflow-y: auto;
+  font-family: monospace; font-size: 11px; color: #a8c4e0;
 }
-.log-entry { margin-bottom: 4px; }
-.log-entry .ts { color: #66a0c8; margin-right: 6px; }
-.log-entry .source { color: #f0b429; margin-right: 6px; }
-.log-entry .height { color: #6ee7b7; }
+.log-entry { margin-bottom: 3px; }
+.log-entry .ts  { color: #66a0c8; margin-right: 5px; }
+.log-entry .src { color: #f0b429; margin-right: 5px; }
+.log-entry .h   { color: #6ee7b7; }
 </style>
 </head>
 <body>
 
-<h1>CNA Embed Test — World Cup 2026 Charts</h1>
-<p class="subtitle">監聽 <code>wc2026-resize</code> postMessage 並動態調整 iframe 高度。小組積分初始高度 430px，其餘圖表初始高度 800px。</p>
+<!-- CNA nav -->
+<nav class="cna-nav">
+  <span class="cna-nav-logo">CNA</span>
+  <span class="cna-nav-label">中央通訊社 ／ 模擬文章頁（嵌入測試）</span>
+</nav>
 
-<div class="embed-block">
-  <div class="embed-label">
-    📅 wc2026-schedule.html (Mobile 375px)
-    <span class="height-badge" id="h-schedule">height: 800px</span>
-  </div>
-  <iframe id="frame-schedule" src="wc2026-schedule.html" title="賽程"></iframe>
-  <div class="controls">
-    <button onclick="setWidth('frame-schedule', 375)">375px (Mobile)</button>
-    <button onclick="setWidth('frame-schedule', 900)" class="pc">900px (PC)</button>
-    <button onclick="resetHeight('frame-schedule')">Reset 800px</button>
-  </div>
+<!-- dev toolbar -->
+<div class="dev-bar">
+  <span class="dev-bar-title">模擬寬度：</span>
+  <button class="dev-btn" onclick="setArticleWidth(375)">375px Mobile</button>
+  <button class="dev-btn" onclick="setArticleWidth(430)">430px Mobile L</button>
+  <button class="dev-btn" onclick="setArticleWidth(768)">768px Tablet</button>
+  <button class="dev-btn active" onclick="setArticleWidth(800)">800px PC (預設)</button>
 </div>
 
-<div class="embed-block">
-  <div class="embed-label">
-    🏆 wc2026-groups.html (Mobile 375px)
-    <span class="height-badge" id="h-groups">height: 430px</span>
-  </div>
-  <iframe id="frame-groups" src="wc2026-groups.html" title="積分榜" style="height:430px"></iframe>
-  <div class="controls">
-    <button onclick="setWidth('frame-groups', 375)">375px (Mobile)</button>
-    <button onclick="setWidth('frame-groups', 900)">900px (PC)</button>
-    <button onclick="resetHeight('frame-groups')">Reset 430px</button>
-  </div>
+<!-- article shell -->
+<div id="article-shell">
+<div class="article-wrap">
+
+  <div class="article-category">體育 / 世界盃 2026</div>
+  <h1 class="article-headline">2026 FIFA 世界杯賽程、積分與晉級路線一覽</h1>
+  <div class="article-meta">2026年6月8日 ／ 中央社編輯部</div>
+
+  <div class="article-body">
+
+    <p>2026年世界杯由美國、加拿大與墨西哥三國聯合主辦，共48支球隊參賽，分成12個小組進行循環賽，以下互動圖表即時更新各組賽程與比分。</p>
+
+    <!-- embed 1: 賽程 -->
+    <div class="wc2026-embed"
+         data-src="wc2026-schedule.html"
+         data-title="FIFA 世界杯 2026 賽程"
+         data-height="847">
+    </div>
+    <p class="chart-label">▲ 互動賽程表（點擊場次可查看詳情）</p>
+
+    <p>小組賽結束後，各組前兩名及四支最佳第三名共32支球隊進入淘汰賽，以下積分榜即時反映最新排名。</p>
+
+    <!-- embed 2: 積分榜 -->
+    <div class="wc2026-embed"
+         data-src="wc2026-groups.html"
+         data-title="FIFA 世界杯 2026 積分榜"
+         data-height="460">
+    </div>
+    <p class="chart-label">▲ 各組積分榜（即時更新）</p>
+
+    <p>淘汰賽從16強開始，逐輪對決直至決賽，以下晉級圖呈現完整對陣路線。</p>
+
+    <!-- embed 3: 淘汰賽對陣圖 -->
+    <div class="wc2026-embed"
+         data-src="wc2026-bracket.html"
+         data-title="FIFA 世界杯 2026 淘汰賽對陣"
+         data-height="800">
+    </div>
+    <p class="chart-label">▲ 淘汰賽晉級對陣圖</p>
+
+  </div><!-- /article-body -->
+</div><!-- /article-wrap -->
+</div><!-- /article-shell -->
+
+<!-- postMessage log (dev only) -->
+<div class="dev-bar" style="margin-top:0">
+  <span class="dev-bar-title">postMessage log</span>
 </div>
-
-<div class="embed-block">
-  <div class="embed-label">
-    🌳 wc2026-bracket.html (Mobile 375px)
-    <span class="height-badge" id="h-bracket">height: 800px</span>
-  </div>
-  <iframe id="frame-bracket" src="wc2026-bracket.html" title="賽程樹"></iframe>
-  <div class="controls">
-    <button onclick="setWidth('frame-bracket', 375)">375px (Mobile)</button>
-    <button onclick="setWidth('frame-bracket', 900)">900px (PC)</button>
-    <button onclick="resetHeight('frame-bracket')">Reset 800px</button>
-  </div>
-</div>
-
-
 <div class="log-panel" id="log">
-  <div class="log-entry"><span class="ts">--:--:--</span>等待 postMessage…</div>
+  <div class="log-entry"><span class="ts">--:--:--</span>等待 wc2026-resize 訊息…</div>
 </div>
 
+<!-- real embed loader (same script CNA will use) -->
+<script src="embed-loader.js"></script>
+
+<!-- dev: width switcher + message log -->
 <script>
-const frameMap = {
-  'frame-schedule': { badgeId: 'h-schedule', minHeight: 800 },
-  'frame-groups':   { badgeId: 'h-groups',   minHeight: 430 },
-  'frame-bracket':  { badgeId: 'h-bracket',  minHeight: 800 },
-};
+function setArticleWidth(px) {
+  document.getElementById('article-shell').style.maxWidth = px + 'px';
+  document.querySelectorAll('.dev-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
 
-window.addEventListener('message', e => {
-  if (!e.data || e.data.type !== 'wc2026-resize') return;
-
-  const height = e.data.height;
-  const source = e.source;
-
-  // Find which iframe sent the message
-  let frameId = null;
-  for (const [id] of Object.entries(frameMap)) {
-    const frame = document.getElementById(id);
-    if (frame && frame.contentWindow === source) {
-      frameId = id;
-      break;
-    }
+// Augment embed-loader's message handler just to log it
+window.addEventListener('message', function (e) {
+  if (!e.data) return;
+  if (e.data.type === 'wc2026-scrollTo') {
+    // Already handled by embed-loader.js — just log it
+    var log = document.getElementById('log');
+    var ts  = new Date().toTimeString().slice(0, 8);
+    var entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = '<span class="ts">' + ts + '</span>'
+                    + '<span class="src">wc2026-scrollTo</span>'
+                    + '<span class="h">offset: ' + e.data.offset + 'px</span>';
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
   }
-
-  if (frameId) {
-    const frame = document.getElementById(frameId);
-    const config = frameMap[frameId];
-    const nextHeight = Math.max(height, config.minHeight);
-    frame.style.height = nextHeight + 'px';
-    document.getElementById(config.badgeId).textContent = `height: ${nextHeight}px`;
-  }
-
-  // Log
-  const log = document.getElementById('log');
-  const now = new Date();
-  const ts = now.toTimeString().slice(0, 8);
-  const sourceName = frameId || 'unknown';
-  const entry = document.createElement('div');
+  if (e.data.type !== 'wc2026-resize') return;
+  var log   = document.getElementById('log');
+  var now   = new Date();
+  var ts    = now.toTimeString().slice(0, 8);
+  // Find which embed sent it
+  var label = 'unknown';
+  document.querySelectorAll('.wc2026-embed[data-wc2026-processed] iframe').forEach(function (f) {
+    if (f.contentWindow === e.source) label = f.getAttribute('data-src') || f.src.split('/').pop();
+  });
+  var entry = document.createElement('div');
   entry.className = 'log-entry';
-  entry.innerHTML = `<span class="ts">${ts}</span><span class="source">${sourceName}</span><span class="height">height: ${height}px</span>`;
+  entry.innerHTML = '<span class="ts">' + ts + '</span>'
+                  + '<span class="src">' + label + '</span>'
+                  + '<span class="h">height: ' + e.data.height + 'px</span>';
   log.appendChild(entry);
   log.scrollTop = log.scrollHeight;
 });
-
-function setWidth(frameId, px) {
-  const frame = document.getElementById(frameId);
-  frame.style.width = px + 'px';
-}
-
-function resetHeight(frameId) {
-  const frame = document.getElementById(frameId);
-  const config = frameMap[frameId];
-  frame.style.height = config.minHeight + 'px';
-  document.getElementById(config.badgeId).textContent = `height: ${config.minHeight}px`;
-}
 </script>
 </body>
 </html>

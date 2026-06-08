@@ -68,6 +68,22 @@ function clearManualOverride(matchId) {
   return true;
 }
 
+function clearAllScores() {
+  const ss     = SpreadsheetApp.openById(SHEET_ID);
+  const sheet  = ss.getSheetByName('matches');
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) { SpreadsheetApp.getUi().alert('No data rows found.'); return; }
+
+  const numRows = lastRow - 1;
+  // Col M (score_home) + N (score_away) → blank; Col O (status) → 'upcoming'; Col R (manual) → blank
+  sheet.getRange(2, 13, numRows, 2).clearContent();                        // score_home, score_away
+  sheet.getRange(2, 15, numRows, 1).setValue('upcoming');                   // status
+  sheet.getRange(2, 18, numRows, 1).clearContent();                         // manual lock
+
+  recalcGroups(); // resets group standings to all-zero
+  SpreadsheetApp.getUi().alert('Done — all scores cleared, standings reset to 0.');
+}
+
 function setupSheetValidation() {
   setupHeaders(); // ensure headers exist before applying validation
 
