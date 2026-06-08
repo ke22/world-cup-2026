@@ -177,8 +177,8 @@ button { font-family: inherit; cursor: pointer; border: none; }
   font-size: 13px; font-weight: 700; color: var(--fg);
   text-align: center; line-height: 1.3; white-space: nowrap;
 }
-.team-name.sm { font-size: 11px; }
-.team-name.xs { font-size: 9px; }
+.team-name.sm { font-size: 11px; white-space: normal; }
+.team-name.xs { font-size: 9px; white-space: normal; }
 
 .card-center {
   display: flex; flex-direction: column; align-items: center;
@@ -278,8 +278,8 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .group-table .team-cell { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .group-table .t-flag { font-size: 14px; flex-shrink: 0; }
 .group-table .t-name    { font-size: 11px; font-weight: 600; color: var(--fg); white-space: nowrap; }
-.group-table .t-name.sm { font-size: 9px; }
-.group-table .t-name.xs { font-size: 7.5px; }
+.group-table .t-name.sm { font-size: 9px; white-space: normal; }
+.group-table .t-name.xs { font-size: 7.5px; white-space: normal; }
 .group-table .pts-cell { font-weight: 800; color: var(--accent); }
 
 img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
@@ -312,6 +312,8 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 const GAS_URL      = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';   // GAS Web App 部署 URL
 const CACHE_TTL    = 300;  // 快取秒數
 const LIVE_REFRESH = 60;   // live 場次自動刷新秒數
+const TEAM_NAMES   = { '波士尼亞': '波赫', '剛果': '民主剛果' };
+function teamName(n) { return TEAM_NAMES[n] || n; }
 // ────────────────────────────────────────────
 function parseTwemoji(el) {
   if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
@@ -587,8 +589,8 @@ function renderMatchCard(m) {
   if (m.city)  parts.push(m.city);
   const infoLine = parts.join(' · ');
 
-  const n1 = m.team1.name || m.team1.code || '待定';
-  const n2 = m.team2.name || m.team2.code || '待定';
+  const n1 = teamName(m.team1.name) || m.team1.code || '待定';
+  const n2 = teamName(m.team2.name) || m.team2.code || '待定';
   const nc = n => n.length >= 7 ? 'xs' : n.length >= 5 ? 'sm' : '';
   const nc1 = nc(n1), nc2 = nc(n2);
 
@@ -663,7 +665,7 @@ function renderGroupsGrid(groups) {
               <td>
                 <div class="team-cell">
                   <span class="t-flag">${t.team.flag}</span>
-                  <span class="t-name${((t.team.name||t.team.code||'').length>=7?' xs':(t.team.name||t.team.code||'').length>=5?' sm':'')}">${t.team.name || t.team.code}</span>
+                  <span class="t-name${((teamName(t.team.name||t.team.code||'')).length>=7?' xs':(teamName(t.team.name||t.team.code||'')).length>=5?' sm':'')}">${teamName(t.team.name) || t.team.code}</span>
                 </div>
               </td>
               <td>${t.played}</td>

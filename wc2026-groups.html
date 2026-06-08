@@ -159,8 +159,8 @@ body {
 .team-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .t-flag { font-size: 1rem; line-height: 1; flex-shrink: 0; }
 .t-name    { font-size: 16px; font-weight: 700; color: var(--fg); white-space: nowrap; }
-.t-name.sm { font-size: 13px; }
-.t-name.xs { font-size: 10px; }
+.t-name.sm { font-size: 13px; white-space: normal; }
+.t-name.xs { font-size: 10px; white-space: normal; }
 
 /* ── Stats cells ── */
 .rank-cell { color: var(--muted); font-size: 0.83rem; font-weight: 600; }
@@ -225,6 +225,8 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 <script>
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
 const CACHE_TTL = 300;
+const TEAM_NAMES = { '波士尼亞': '波赫', '剛果': '民主剛果' };
+function teamName(n) { return TEAM_NAMES[n] || n; }
 function parseTwemoji(el) {
   if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
 }
@@ -316,7 +318,7 @@ function renderGroups(groups) {
           <td class="td-team">
             <div class="team-cell">
               <span class="t-flag">${t.team.flag}</span>
-              <span class="t-name${((t.team.name||t.team.code||'').length>=7?' xs':(t.team.name||t.team.code||'').length>=5?' sm':'')}" title="${t.team.name || t.team.code}">${t.team.name || t.team.code}</span>
+              <span class="t-name${((teamName(t.team.name||t.team.code||'')).length>=7?' xs':(teamName(t.team.name||t.team.code||'')).length>=5?' sm':'')}" title="${teamName(t.team.name) || t.team.code}">${teamName(t.team.name) || t.team.code}</span>
             </div>
           </td>
           <td>${t.played}</td>
