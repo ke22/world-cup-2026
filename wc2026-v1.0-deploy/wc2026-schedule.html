@@ -591,7 +591,7 @@ function renderMatchCard(m) {
 
   const n1 = teamName(m.team1.name) || m.team1.code || '待定';
   const n2 = teamName(m.team2.name) || m.team2.code || '待定';
-  const nc = n => n.length >= 7 ? 'xs' : n.length >= 5 ? 'sm' : '';
+  const nc = n => n.length >= 9 ? 'xs' : n.length >= 7 ? 'sm' : '';
   const nc1 = nc(n1), nc2 = nc(n2);
 
   return `
