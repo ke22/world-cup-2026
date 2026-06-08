@@ -266,6 +266,9 @@ function renderAnchorNav(groupKeys) {
   ).join('');
 }
 
+let _scrollLock = false;
+let _scrollLockTimer = null;
+
 function showGroup(letter) {
   document.querySelectorAll('.anchor-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.group === letter)
@@ -273,7 +276,10 @@ function showGroup(letter) {
   const container = document.getElementById('groups-container');
   const target = document.getElementById(`group-${letter}`);
   if (target && container) {
+    _scrollLock = true;
+    clearTimeout(_scrollLockTimer);
     container.scrollTop += target.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    _scrollLockTimer = setTimeout(() => { _scrollLock = false; }, 400);
   }
 }
 
@@ -354,19 +360,20 @@ function notifyHeight() {
 
 function initScrollSync() {
   const container = document.getElementById('groups-container');
-  try {
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          const letter = e.target.id.replace('group-', '');
-          document.querySelectorAll('.anchor-btn').forEach(b =>
-            b.classList.toggle('active', b.dataset.group === letter)
-          );
-        }
-      });
-    }, { root: container, threshold: 0.4 });
-    document.querySelectorAll('.group-section').forEach(s => io.observe(s));
-  } catch {}
+  container.addEventListener('scroll', () => {
+    if (_scrollLock) return;
+    const cTop = container.getBoundingClientRect().top + 10;
+    let active = null;
+    document.querySelectorAll('.group-section').forEach(s => {
+      if (s.getBoundingClientRect().top <= cTop) active = s;
+    });
+    if (active) {
+      const letter = active.id.replace('group-', '');
+      document.querySelectorAll('.anchor-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.group === letter)
+      );
+    }
+  }, { passive: true });
 }
 
 async function init() {
