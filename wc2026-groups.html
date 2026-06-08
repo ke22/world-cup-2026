@@ -272,7 +272,9 @@ function showGroup(letter) {
   );
   const container = document.getElementById('groups-container');
   const target = document.getElementById(`group-${letter}`);
-  if (target && container) container.scrollTop = target.offsetTop;
+  if (target && container) {
+    container.scrollTop += target.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  }
 }
 
 function gdDisplay(gd) {
