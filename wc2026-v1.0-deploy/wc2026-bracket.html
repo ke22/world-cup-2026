@@ -873,7 +873,8 @@ function groupBox(letter, sz) {
   }
   const rows = g.teams.map(([flag, name]) => {
     const nc = name.length >= 6 ? ' xs' : name.length >= 4 ? ' sm' : '';
-    return `<div class="gb-row"><span class="gb-flag">${flag}</span><span class="gb-name${nc}" title="${name}">${name}</span></div>`;
+    const dn = nc === ' xs' ? name.slice(0, 3) + '<br>' + name.slice(3) : name;
+    return `<div class="gb-row"><span class="gb-flag">${flag}</span><span class="gb-name${nc}" title="${name}">${dn}</span></div>`;
   }).join('');
   return `<div class="group-box" style="--gc:${g.color}">
     <div class="group-name">${letter}</div>
