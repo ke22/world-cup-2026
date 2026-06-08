@@ -26,7 +26,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 20px; }
+html { font-size: 20px; height: 100%; overflow: hidden; }
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
@@ -35,6 +35,8 @@ body {
   color: var(--fg);
   font-size: 1rem;
   line-height: 1.5;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* ── Page wrapper ── */
@@ -44,6 +46,8 @@ body {
   padding: 14px 14px 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* ── Header ── */
@@ -60,7 +64,7 @@ body {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ── Anchor nav (sticky) ── */
+/* ── Anchor nav ── */
 .anchor-nav {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -69,10 +73,8 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
   box-shadow: 0 2px 8px var(--shadow);
+  flex-shrink: 0;
 }
 .anchor-btn {
   height: 44px;
@@ -105,15 +107,19 @@ body {
   border-radius: 0 0 16px 16px;
   box-shadow: 0 10px 30px var(--shadow);
   padding: 16px;
-  min-height: 320px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Group section ── */
 .group-section {
-  display: none;
-}
-.group-section.active {
   display: block;
+  margin-bottom: 16px;
+}
+.group-section:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Group card ── */
@@ -189,7 +195,7 @@ body {
     flex: 1 1 0;
     min-width: 0;
   }
-  .groups-container { min-height: unset; }
+  .groups-container { padding: 12px; }
 }
 
 img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline-block; }
@@ -261,15 +267,12 @@ function renderAnchorNav(groupKeys) {
 }
 
 function showGroup(letter) {
-  // Switch active tab button
-  document.querySelectorAll('.anchor-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.group === letter);
-  });
-  // Show only the selected group section
-  document.querySelectorAll('.group-section').forEach(s => {
-    s.classList.toggle('active', s.id === `group-${letter}`);
-  });
-  notifyHeight();
+  document.querySelectorAll('.anchor-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.group === letter)
+  );
+  const container = document.getElementById('groups-container');
+  const target = document.getElementById(`group-${letter}`);
+  if (target && container) container.scrollTop = target.offsetTop;
 }
 
 function gdDisplay(gd) {
@@ -319,7 +322,7 @@ function renderGroups(groups) {
     }).join('');
 
     return `
-      <section class="group-section${i === 0 ? ' active' : ''}" id="group-${g}">
+      <section class="group-section" id="group-${g}">
         <div class="group-card">
           <div class="group-card-title">${g} 組</div>
           <div class="group-table-wrap"><table class="group-table" aria-label="${g} 組積分">
@@ -343,22 +346,26 @@ function renderGroups(groups) {
   }).join('');
 }
 
-function notifyHeight() {}
-
-function getEmbedHeight() {
-  return document.documentElement.scrollHeight;
+function notifyHeight() {
+  window.parent.postMessage({ type: 'wc2026-resize', height: 600 }, '*');
 }
 
-try {
-  let lastHeight = 0;
-  new ResizeObserver(() => {
-    const h = Math.ceil(getEmbedHeight());
-    if (h !== lastHeight) {
-      lastHeight = h;
-      window.parent.postMessage({ type: 'wc2026-resize', height: h }, '*');
-    }
-  }).observe(document.body);
-} catch {}
+function initScrollSync() {
+  const container = document.getElementById('groups-container');
+  try {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const letter = e.target.id.replace('group-', '');
+          document.querySelectorAll('.anchor-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.group === letter)
+          );
+        }
+      });
+    }, { root: container, threshold: 0.4 });
+    document.querySelectorAll('.group-section').forEach(s => io.observe(s));
+  } catch {}
+}
 
 async function init() {
   if (!GAS_URL) {
@@ -371,6 +378,7 @@ async function init() {
     const groups = await fetchGroups();
     renderGroups(groups);
     parseTwemoji(document.getElementById('groups-container'));
+    initScrollSync();
     notifyHeight();
   } catch (err) {
     document.getElementById('groups-container').innerHTML =
