@@ -121,6 +121,8 @@ body {
   display: block;
   overflow-x: auto;
   overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 /* Outer wrapper */
@@ -1152,6 +1154,7 @@ function mobileToggleRound(round, btn) {
   cols.forEach(c => c.classList.toggle('collapsed', willCollapse));
   btn.classList.toggle('active', !willCollapse);
   requestAnimationFrame(fitBracket);
+  setTimeout(fitBracket, 280);
 }
 
 function syncMobileNavButtons() {
@@ -1176,7 +1179,9 @@ function toggleDesktopCol(col) {
     c.classList.toggle('collapsed', willCollapse);
   });
   syncMobileNavButtons();
+  // call once immediately (height update) and once after the width transition (250ms) completes
   requestAnimationFrame(fitBracket);
+  setTimeout(fitBracket, 280);
 }
 
 /* ── Mobile match card ─────────────────────────── */
