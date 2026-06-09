@@ -224,10 +224,11 @@ function doGet(e) {
 
   try {
     switch (action) {
-      case 'getMatches': result = getMatches(e.parameter); break;
-      case 'getGroups':  result = getGroups(e.parameter);  break;
-      case 'getConfig':  result = getConfig();              break;
-      default:           result = { status: 'error', message: 'Invalid action' };
+      case 'getMatches':   result = getMatches(e.parameter);    break;
+      case 'getGroups':    result = getGroups(e.parameter);     break;
+      case 'getConfig':    result = getConfig();                 break;
+      case 'updateMatch':  result = updateMatchFromGet(e.parameter); break;
+      default:             result = { status: 'error', message: 'Invalid action' };
     }
   } catch (err) {
     result = { status: 'error', message: err.message };
@@ -268,6 +269,29 @@ function doPost(e) {
       .createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function updateMatchFromGet(p) {
+  const matchId = Number(p.match_id);
+  if (!matchId) throw new Error('missing match_id');
+
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+  const rows  = sheet.getDataRange().getValues();
+  const i     = rows.findIndex((r, idx) => idx > 0 && Number(r[0]) === matchId);
+  if (i < 0) throw new Error('match not found: ' + matchId);
+
+  if (p.score1 !== undefined && p.score1 !== '')
+    sheet.getRange(i + 1, 13).setValue(Number(p.score1));
+  if (p.score2 !== undefined && p.score2 !== '')
+    sheet.getRange(i + 1, 14).setValue(Number(p.score2));
+  if (p.status)
+    sheet.getRange(i + 1, 15).setValue(p.status);
+
+  sheet.getRange(i + 1, 18).setValue(true);
+
+  if (p.status === 'finished') recalcGroups();
+
+  return { status: 'ok', match_id: matchId };
 }
 
 // ─── getMatches ───────────────────────────────

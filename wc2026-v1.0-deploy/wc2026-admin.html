@@ -380,15 +380,11 @@ async function saveMatch(matchId) {
   card.classList.remove('saved', 'error-state');
 
   try {
-    const body = { action: 'updateMatch', match_id: matchId, status: st };
-    if (s1 !== '') body.score1 = Number(s1);
-    if (s2 !== '') body.score2 = Number(s2);
-
-    const res  = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(body)
-    });
+    const params = new URLSearchParams({ action: 'updateMatch', match_id: matchId });
+    if (s1 !== '') params.set('score1', s1);
+    if (s2 !== '') params.set('score2', s2);
+    if (st)        params.set('status', st);
+    const res = await fetch(`${GAS_URL}?${params}`);
     const json = await res.json();
     if (json.status !== 'ok') throw new Error(json.message || '儲存失敗');
 
