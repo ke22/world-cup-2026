@@ -238,6 +238,38 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function doPost(e) {
+  try {
+    const d = JSON.parse(e.postData.contents);
+    if (d.action !== 'updateMatch') throw new Error('unknown action');
+
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+    const rows  = sheet.getDataRange().getValues();
+    const i     = rows.findIndex((r, idx) => idx > 0 && Number(r[0]) === Number(d.match_id));
+    if (i < 0) throw new Error('match not found: ' + d.match_id);
+
+    if (d.score1 !== undefined && d.score1 !== '')
+      sheet.getRange(i + 1, 13).setValue(Number(d.score1));
+    if (d.score2 !== undefined && d.score2 !== '')
+      sheet.getRange(i + 1, 14).setValue(Number(d.score2));
+    if (d.status)
+      sheet.getRange(i + 1, 15).setValue(d.status);
+
+    sheet.getRange(i + 1, 18).setValue(true);
+
+    if (d.status === 'finished') recalcGroups();
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'ok', match_id: d.match_id }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'error', message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // ─── getMatches ───────────────────────────────
 
 function getMatches(params) {

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>WC2026 比分管理</title>
+<style>
+:root {
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --fg: #1f2937;
+  --muted: #66758a;
+  --border: rgba(15, 50, 96, 0.12);
+  --shadow: rgba(15, 75, 143, 0.08);
+  --accent: #0f4b8f;
+  --accent-2: #2c73c9;
+  --accent-soft: rgba(15, 75, 143, 0.08);
+  --green: #16a34a;
+  --green-soft: rgba(22, 163, 74, 0.1);
+  --red: #dc2626;
+  --red-soft: rgba(220, 38, 38, 0.08);
+  --live-color: #d63200;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+}
+
+.page { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* Header */
+.page-header {
+  background: linear-gradient(180deg, #13579f 0%, #0f4b8f 100%);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.page-header-title { font-size: 1.15rem; font-weight: 700; color: #fff; }
+.page-header-sub { font-size: 0.78rem; color: rgba(255,255,255,0.65); margin-left: auto; }
+
+/* Date nav */
+.date-nav {
+  background: var(--surface-2);
+  border: 1px solid var(--border); border-top: none;
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.date-btn {
+  height: 36px; padding: 0 14px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--accent);
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+.date-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.date-btn:hover:not(.active) { background: var(--accent-soft); border-color: var(--accent); }
+.date-input {
+  height: 36px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg);
+  font-size: 0.85rem; font-family: inherit; cursor: pointer;
+}
+.date-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.match-count { margin-left: auto; font-size: 0.78rem; color: var(--muted); }
+
+/* Match list */
+.match-list {
+  background: var(--surface);
+  border: 1px solid var(--border); border-top: none;
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+/* Match card */
+.match-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.match-card.saved {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.match-card.error-state {
+  border-color: var(--red);
+}
+
+.card-meta {
+  font-size: 0.72rem; color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.card-teams {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.card-team {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.card-flag { font-size: 1.6rem; line-height: 1; }
+.card-name { font-size: 0.82rem; font-weight: 700; text-align: center; }
+
+.card-scores {
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.score-input {
+  width: 48px; height: 40px;
+  text-align: center; font-size: 1.2rem; font-weight: 800;
+  border: 2px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); color: var(--fg);
+  font-family: inherit;
+  transition: border-color 0.12s;
+}
+.score-input:focus { outline: none; border-color: var(--accent); background: #fff; }
+.score-sep { font-size: 1.2rem; font-weight: 700; color: var(--muted); }
+
+.card-controls {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.status-label { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
+.status-select {
+  height: 34px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg);
+  font-size: 0.82rem; font-family: inherit; cursor: pointer;
+  flex: 1; min-width: 120px;
+}
+.status-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.status-select.live { border-color: var(--live-color); color: var(--live-color); background: #fff8f5; }
+.status-select.finished { border-color: var(--green); color: var(--green); }
+
+.save-btn {
+  height: 34px; padding: 0 16px;
+  border-radius: 8px; border: none;
+  background: var(--accent); color: #fff;
+  font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+  transition: background 0.12s, transform 0.1s;
+}
+.save-btn:hover { background: var(--accent-2); }
+.save-btn:active { transform: scale(0.97); }
+.save-btn:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
+
+.card-feedback {
+  margin-top: 8px; font-size: 0.75rem;
+  min-height: 18px;
+}
+.card-feedback.ok { color: var(--green); }
+.card-feedback.err { color: var(--red); }
+
+/* State messages */
+.state-msg {
+  text-align: center; padding: 40px 20px;
+  font-size: 0.95rem; color: var(--muted);
+}
+.state-error { color: var(--red); }
+
+/* Preview section */
+.preview-section {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.preview-header {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.preview-title { font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+.preview-tabs { display: flex; gap: 6px; margin-left: auto; }
+.preview-tab {
+  height: 30px; padding: 0 12px;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--accent);
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.preview-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.preview-tab:hover:not(.active) { background: var(--accent-soft); }
+
+.preview-iframe-wrap { width: 100%; }
+.preview-iframe-wrap iframe {
+  width: 100%; border: none; display: block;
+  transition: height 0.2s;
+}
+
+.reload-btn {
+  height: 30px; padding: 0 12px;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted);
+  font-size: 0.78rem; cursor: pointer; font-family: inherit;
+  transition: background 0.12s;
+}
+.reload-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="page-header">
+    <span class="page-header-title">⚽ WC2026 比分管理</span>
+    <span class="page-header-sub" id="last-updated"></span>
+  </header>
+
+  <div class="date-nav" id="date-nav">
+    <button class="date-btn" id="btn-today" onclick="setRelDay(0)">今天</button>
+    <button class="date-btn" id="btn-tomorrow" onclick="setRelDay(1)">明天</button>
+    <input type="date" class="date-input" id="date-picker" onchange="setDate(this.value)">
+    <span class="match-count" id="match-count"></span>
+  </div>
+
+  <div class="match-list" id="match-list">
+    <div class="state-msg">載入中…</div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-section">
+    <div class="preview-header">
+      <span class="preview-title">即時預覽</span>
+      <div class="preview-tabs">
+        <button class="preview-tab active" onclick="switchPreview('schedule', this)">賽程</button>
+        <button class="preview-tab" onclick="switchPreview('groups', this)">積分</button>
+        <button class="preview-tab" onclick="switchPreview('bracket', this)">對陣圖</button>
+      </div>
+      <button class="reload-btn" onclick="reloadPreview()" style="margin-left:8px" title="手動重載">↺</button>
+    </div>
+    <div class="preview-iframe-wrap">
+      <iframe id="preview-iframe" src="" height="600" scrolling="no"></iframe>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
+const BASE    = 'https://ke22.github.io/world-cup-2026';
+
+const PREVIEW_SRCS = {
+  schedule: `${BASE}/wc2026-schedule.html`,
+  groups:   `${BASE}/wc2026-groups.html`,
+  bracket:  `${BASE}/wc2026-bracket.html`,
+};
+
+const CACHE_KEYS = ['wc26_matches', 'wc26_groups', 'wc26_bracket'];
+
+let currentDate  = todayUTC8();
+let currentPreview = 'schedule';
+let allMatches   = [];
+
+/* ── Date helpers ── */
+function todayUTC8() {
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+function setRelDay(offset) {
+  const base = new Date(todayUTC8());
+  base.setDate(base.getDate() + offset);
+  const s = base.toISOString().slice(0, 10);
+  setDate(s);
+}
+
+function setDate(dateStr) {
+  currentDate = dateStr;
+  document.getElementById('date-picker').value = dateStr;
+  const today    = todayUTC8();
+  const tomorrow = (() => { const d = new Date(today); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+  document.getElementById('btn-today').classList.toggle('active',    dateStr === today);
+  document.getElementById('btn-tomorrow').classList.toggle('active', dateStr === tomorrow);
+  renderMatches();
+}
+
+/* ── Fetch + render ── */
+async function loadMatches() {
+  try {
+    const res  = await fetch(`${GAS_URL}?action=getMatches`);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message);
+    allMatches = json.data;
+    document.getElementById('last-updated').textContent = '資料時間 ' + new Date(json.updated).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    renderMatches();
+  } catch (err) {
+    document.getElementById('match-list').innerHTML =
+      `<div class="state-msg state-error">資料載入失敗<br><small>${err.message}</small></div>`;
+  }
+}
+
+function renderMatches() {
+  const matches = allMatches.filter(m => m.date === currentDate);
+  const list    = document.getElementById('match-list');
+  document.getElementById('match-count').textContent = matches.length ? `共 ${matches.length} 場` : '';
+
+  if (!matches.length) {
+    list.innerHTML = `<div class="state-msg">這天沒有比賽</div>`;
+    return;
+  }
+
+  list.innerHTML = matches.map(m => {
+    const n1 = m.team1.name || m.team1.code || '待定';
+    const n2 = m.team2.name || m.team2.code || '待定';
+    const f1 = m.team1.flag || '';
+    const f2 = m.team2.flag || '';
+    const s1 = m.score1 !== null ? m.score1 : '';
+    const s2 = m.score2 !== null ? m.score2 : '';
+    const meta = [m.time_utc8 ? m.time_utc8 + ' 台灣時間' : '',
+                  m.group ? m.group + '組' : m.phase || '',
+                  m.venue || '', m.city || ''].filter(Boolean).join(' · ');
+    const liveClass = m.status === 'live' ? ' live' : m.status === 'finished' ? ' finished' : '';
+    return `
+      <div class="match-card" id="card-${m.match_id}">
+        <div class="card-meta">${meta}</div>
+        <div class="card-teams">
+          <div class="card-team">
+            <span class="card-flag">${f1}</span>
+            <span class="card-name">${n1}</span>
+          </div>
+          <div class="card-scores">
+            <input class="score-input" type="number" min="0" max="20" value="${s1}"
+              id="s1-${m.match_id}" placeholder="–">
+            <span class="score-sep">:</span>
+            <input class="score-input" type="number" min="0" max="20" value="${s2}"
+              id="s2-${m.match_id}" placeholder="–">
+          </div>
+          <div class="card-team">
+            <span class="card-flag">${f2}</span>
+            <span class="card-name">${n2}</span>
+          </div>
+        </div>
+        <div class="card-controls">
+          <span class="status-label">狀態：</span>
+          <select class="status-select${liveClass}" id="st-${m.match_id}"
+            onchange="onStatusChange(this)">
+            <option value="upcoming"  ${m.status==='upcoming'  ? 'selected':''}>⏳ 未開賽</option>
+            <option value="live"      ${m.status==='live'      ? 'selected':''}>🔴 進行中</option>
+            <option value="finished"  ${m.status==='finished'  ? 'selected':''}>✅ 已結束</option>
+          </select>
+          <button class="save-btn" onclick="saveMatch(${m.match_id})">
+            💾 儲存
+          </button>
+        </div>
+        <div class="card-feedback" id="fb-${m.match_id}"></div>
+      </div>`;
+  }).join('');
+}
+
+function onStatusChange(sel) {
+  sel.className = 'status-select' + (sel.value === 'live' ? ' live' : sel.value === 'finished' ? ' finished' : '');
+}
+
+/* ── Save ── */
+async function saveMatch(matchId) {
+  const btn  = document.querySelector(`#card-${matchId} .save-btn`);
+  const fb   = document.getElementById(`fb-${matchId}`);
+  const card = document.getElementById(`card-${matchId}`);
+  const s1   = document.getElementById(`s1-${matchId}`).value;
+  const s2   = document.getElementById(`s2-${matchId}`).value;
+  const st   = document.getElementById(`st-${matchId}`).value;
+
+  btn.disabled = true;
+  btn.textContent = '儲存中…';
+  fb.textContent  = '';
+  fb.className    = 'card-feedback';
+  card.classList.remove('saved', 'error-state');
+
+  try {
+    const body = { action: 'updateMatch', match_id: matchId, status: st };
+    if (s1 !== '') body.score1 = Number(s1);
+    if (s2 !== '') body.score2 = Number(s2);
+
+    const res  = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || '儲存失敗');
+
+    // Update local cache
+    const m = allMatches.find(x => x.match_id === matchId);
+    if (m) {
+      if (s1 !== '') m.score1 = Number(s1);
+      if (s2 !== '') m.score2 = Number(s2);
+      m.status = st;
+    }
+
+    // Clear widget cache + reload preview
+    CACHE_KEYS.forEach(k => localStorage.removeItem(k));
+    reloadPreview();
+
+    card.classList.add('saved');
+    fb.textContent = '✓ 已儲存';
+    fb.className   = 'card-feedback ok';
+    setTimeout(() => { card.classList.remove('saved'); fb.textContent = ''; }, 3000);
+
+  } catch (err) {
+    card.classList.add('error-state');
+    fb.textContent = '✗ ' + err.message;
+    fb.className   = 'card-feedback err';
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '💾 儲存';
+  }
+}
+
+/* ── Preview ── */
+function switchPreview(key, btn) {
+  currentPreview = key;
+  document.querySelectorAll('.preview-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  reloadPreview();
+}
+
+function reloadPreview() {
+  const iframe = document.getElementById('preview-iframe');
+  const src    = PREVIEW_SRCS[currentPreview];
+  // Force reload by appending timestamp (bypasses browser cache)
+  iframe.src   = src + '?t=' + Date.now();
+  // Adjust iframe height for fixed-height widgets
+  iframe.height = currentPreview === 'groups' ? 600 : 700;
+}
+
+/* ── postMessage resize from preview iframes ── */
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'wc2026-resize') return;
+  const iframe = document.getElementById('preview-iframe');
+  if (iframe.contentWindow === e.source) {
+    iframe.height = e.data.height;
+  }
+});
+
+/* ── Init ── */
+(function init() {
+  const today = todayUTC8();
+  document.getElementById('date-picker').value = today;
+  document.getElementById('btn-today').classList.add('active');
+  // Load preview immediately
+  reloadPreview();
+  // Load match data
+  loadMatches();
+})();
+</script>
+</body>
+</html>
