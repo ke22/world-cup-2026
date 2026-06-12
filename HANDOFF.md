@@ -1,6 +1,6 @@
 # WC2026 互動圖表 — CNA 交接文件
 
-> 最後更新：2026-06-08
+> 最後更新：2026-06-12
 
 ## 元件清單
 
@@ -80,11 +80,16 @@
 ## 比分更新流程
 
 1. 開啟 [Google Sheet](https://docs.google.com/spreadsheets/d/1YDuNRBGTx5Jw3kZBYehlYUW4eIFPClDIC91TR_720js)
-2. 切換到 `matches` 工作表
+2. 日常編輯建議使用 `比分編輯` 工作表；原始 API 資料仍以 `matches` 工作表為準
 3. 找到對應場次列：
-   - `score1` / `score2`：填入進球數（整數）
-   - `status`：`upcoming` → `live`（賽中）→ `finished`（結束）
-4. 前端快取 5 分鐘後自動更新（`CACHE_TTL = 300`）
+   - `比分`：填入 `主隊-客隊`，例如 `2-1`
+   - `狀態`：`未開賽` → `進行中` → `已結束`
+4. 若要從 football-data.org 同步比分，在 Apps Script 執行 `syncScores()`
+   - `syncScores()` 會更新 `matches`，並在有更新時自動刷新 `比分編輯`
+   - `IN_PLAY` / `PAUSED` / `LIVE` 會同步為 `live`
+   - 若賽中 API 尚未提供 fullTime 比分，會先保留既有比分欄並更新狀態
+   - `matches` 的 R 欄 `manual` 若為勾選，該列會被自動同步略過
+5. 前端目前每次載入都讀最新賽程（`CACHE_TTL = 0`），live 場次會每 60 秒重抓
 
 > **注意**：score 欄留空（不是 0）= 尚未開賽，會顯示開賽時間。填 0 = 0:0 平局進行中。
 

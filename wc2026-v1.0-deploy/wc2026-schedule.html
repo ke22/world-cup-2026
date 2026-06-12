@@ -350,6 +350,11 @@ function toYMD(d) {
   return `${y}-${m}-${day}`;
 }
 
+function todayUTC8(now = Date.now()) {
+  const d = new Date(now + 8 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
 function addDays(date, n) {
   const d = new Date(date);
   d.setDate(d.getDate() + n);
@@ -429,7 +434,7 @@ function getMatchDateSet() {
 }
 
 function findInitialDate() {
-  const today  = toYMD(new Date());
+  const today  = todayUTC8();
   const dates  = [...getMatchDateSet()].sort();
   if (!dates.length) return today;
   if (dates.includes(today)) return today;

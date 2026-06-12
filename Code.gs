@@ -495,6 +495,34 @@ const CODE_MAP = {
 };
 function fdCode(c) { return CODE_MAP[c] || c; }
 
+function footballDataStatusToMatchStatus_(status) {
+  switch (String(status || '').toUpperCase()) {
+    case 'FINISHED':
+      return 'finished';
+    case 'IN_PLAY':
+    case 'PAUSED':
+    case 'LIVE':
+      return 'live';
+    default:
+      return 'upcoming';
+  }
+}
+
+function getFootballDataFullTimeScore_(match) {
+  const s = match && match.score && match.score.fullTime;
+  if (!s) return { home: null, away: null };
+  return {
+    home: s.home === null || s.home === undefined ? null : Number(s.home),
+    away: s.away === null || s.away === undefined ? null : Number(s.away)
+  };
+}
+
+function shouldSyncFootballDataMatch_(match) {
+  const status = footballDataStatusToMatchStatus_(match && match.status);
+  const score = getFootballDataFullTimeScore_(match);
+  return status === 'live' || status === 'finished' || score.home !== null || score.away !== null;
+}
+
 // Convert UTC ISO string to YYYY-MM-DD in UTC+8
 function utcToDate8(utcStr) {
   const d = new Date(new Date(utcStr).getTime() + 8 * 3600000);
@@ -543,18 +571,21 @@ function syncScores() {
     const m = byDateTeams[`${date}_${t1}_${t2}`] || byTeams[`${t1}_${t2}`];
     if (!m) return;
 
-    const s = m.score.fullTime;
-    if (s.home === null && s.away === null) return;
+    const status = footballDataStatusToMatchStatus_(m.status);
+    if (!shouldSyncFootballDataMatch_(m)) return;
 
-    const status = m.status === 'FINISHED' ? 'finished' : 'upcoming';
+    const s = getFootballDataFullTimeScore_(m);
+    const scoreHome = s.home === null ? row[12] : s.home;
+    const scoreAway = s.away === null ? row[13] : s.away;
 
-    sheet.getRange(i + 2, 13, 1, 3).setValues([[s.home, s.away, status]]);
+    sheet.getRange(i + 2, 13, 1, 3).setValues([[scoreHome, scoreAway, status]]);
     updated++;
   });
 
   Logger.log(`syncScores: ${updated} matches updated`);
   if (updated > 0) {
     recalcGroups();
+    try { refreshScoreEditorSheet(false); } catch (err) { Logger.log('refreshScoreEditorSheet skipped: ' + err.message); }
     touchDataVersion();
   }
   syncBracket(); // also fill in knockout teams when bracket is set

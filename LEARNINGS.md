@@ -131,3 +131,24 @@ CNA 要求使用 `data-src` lazy-load 模式。`embed-loader.js`：
 2. 建立 `<iframe>` 替換 div，設 `data-loaded` 標記
 3. 監聽 `message` 事件，比對 `e.source === iframe.contentWindow` 確保只更新對應的 iframe
 4. 積分榜回報固定 600px，loader 直接套用；賽程/晉級圖回報動態高度
+
+---
+
+## 14. 賽程「今天」必須以台灣時間計算
+
+**問題**：賽程頁初始日期用瀏覽器本地 `new Date()`，若讀者或測試環境不在台灣時區，台灣已跨日但本地尚未跨日，就會停在前一天，表面上像 API 沒更新今日內容。
+
+**解法**：新增 `todayUTC8()`，用 UTC+8 產生 `YYYY-MM-DD`，`findInitialDate()` 以此選擇今日賽程。測試固定 `2026-06-11T18:00:00Z`，此時台灣日期應為 `2026-06-12`。
+
+---
+
+## 15. football-data live 狀態不能被 fullTime 空比分擋掉
+
+**問題**：`syncScores()` 原本只有 `score.fullTime.home/away` 非空才寫入 Sheet。賽中 API 可能已回 `IN_PLAY`，但 `fullTime` 仍是 null，導致 `matches` 和 `比分編輯` 沒有更新為 live。
+
+**解法**：將 football-data 狀態集中映射：
+- `FINISHED` → `finished`
+- `IN_PLAY` / `PAUSED` / `LIVE` → `live`
+- 其他 → `upcoming`
+
+live 或 finished 狀態即使 fullTime 尚空也要同步；比分為 null 時保留 Sheet 現有比分欄。`syncScores()` 有更新時也要呼叫 `refreshScoreEditorSheet(false)`，避免前端讀 `matches` 已更新，但編輯分頁看起來沒變。
