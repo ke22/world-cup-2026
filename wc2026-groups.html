@@ -223,36 +223,41 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
-const CACHE_TTL = 300;
-const TEAM_NAMES = { '波士尼亞': '波赫', '剛果': '民主剛果' };
-function teamName(n) { return TEAM_NAMES[n] || n; }
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
+const CACHE_TTL = 0;
+const TEAM_NAMES_BY_CODE = { BIH: '波赫', CUW: '古拉索', CGO: '民主剛果' };
+function teamName(team) {
+  if (!team) return '';
+  if (typeof team === 'string') return team;
+  return TEAM_NAMES_BY_CODE[team.code] || team.name || team.code || '';
+}
 function parseTwemoji(el) {
   if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
 }
 
 function cacheGet(key) {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts < CACHE_TTL * 1000) return data;
-    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
     return null;
   } catch { return null; }
 }
 
 function cacheSet(key, data) {
   try {
-    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
   } catch {}
 }
 
 async function fetchGroups() {
   const key = 'wc26_groups';
+  if (new URLSearchParams(location.search).get('t')) localStorage.removeItem(key);
   const hit = cacheGet(key);
   if (hit) return hit;
-  const url = `${GAS_URL}?action=getGroups`;
+  const url = `${GAS_URL}?action=getGroups&_=${Date.now()}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
@@ -318,7 +323,7 @@ function renderGroups(groups) {
           <td class="td-team">
             <div class="team-cell">
               <span class="t-flag">${t.team.flag}</span>
-              <span class="t-name${((teamName(t.team.name||t.team.code||'')).length>=7?' xs':(teamName(t.team.name||t.team.code||'')).length>=5?' sm':'')}" title="${teamName(t.team.name) || t.team.code}">${teamName(t.team.name) || t.team.code}</span>
+              <span class="t-name${((teamName(t.team)).length>=7?' xs':(teamName(t.team)).length>=5?' sm':'')}" title="${teamName(t.team) || t.team.code}">${teamName(t.team) || t.team.code}</span>
             </div>
           </td>
           <td>${t.played}</td>
@@ -399,6 +404,11 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+window.addEventListener('storage', e => {
+  if (e.key !== 'wc26_refresh_token') return;
+  location.replace(`${location.pathname}?t=${Date.now()}`);
+});
 </script>
 <script>
 if ('serviceWorker' in navigator) {

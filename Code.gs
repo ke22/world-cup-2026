@@ -1,18 +1,43 @@
 // ── 部署時修改這裡 ───────────────────────────
 const SHEET_ID = '1YDuNRBGTx5Jw3kZBYehlYUW4eIFPClDIC91TR_720js';
+const SCORE_EDITOR_SHEET = '比分編輯';
+const TEAM_NAME_ALIASES = {
+  '庫拉索': '古拉索',
+  '剛果': '民主剛果',
+  '波士尼亞': '波赫'
+};
+const TEAM_FLAGS_BY_CODE = {
+  ENG: String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f),
+  SCO: String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0073, 0xe0063, 0xe0074, 0xe007f)
+};
 // ────────────────────────────────────────────
 
 // ── Custom Menu ───────────────────────────────
 
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('⚽ WC2026')
-    .addItem('Update Score…', 'showUpdateScoreDialog')
-    .addItem('Clear Manual Override…', 'showClearOverrideDialog')
-    .addSeparator()
-    .addItem('Recalc Group Standings', 'recalcGroups')
-    .addItem('Setup Sheet Validation', 'setupSheetValidation')
-    .addToUi();
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('⚽ WC2026')
+      .addItem('Update Score…', 'showUpdateScoreDialog')
+      .addItem('Clear Manual Override…', 'showClearOverrideDialog')
+      .addSeparator()
+      .addItem('建立/刷新比分編輯分頁', 'refreshScoreEditorSheet')
+      .addItem('套用比分編輯分頁', 'applyScoreEditorSheet')
+      .addItem('統一中文譯名', 'normalizeTeamNamesInSheets')
+      .addSeparator()
+      .addItem('Recalc Group Standings', 'recalcGroups')
+      .addItem('Sync Bracket (Knockout Teams)', 'syncBracket')
+      .addItem('Setup Sheet Validation', 'setupSheetValidation')
+      .addToUi();
+  } catch (err) {
+    Logger.log('onOpen skipped outside spreadsheet UI: ' + err.message);
+  }
+}
+
+function setupScoreEditor() {
+  normalizeTeamNamesInSheets(false);
+  refreshScoreEditorSheet(false);
+  Logger.log('比分編輯分頁已建立/刷新。請回 Google Sheet 重新整理頁面查看選單。');
 }
 
 function showUpdateScoreDialog() {
@@ -54,6 +79,7 @@ function manualSetScore(matchId, score1, score2) {
   sheet.getRange(i + 1, 13, 1, 3).setValues([[score1, score2, 'finished']]);
   sheet.getRange(i + 1, 18).setValue(true);
   recalcGroups();
+  touchDataVersion();
   Logger.log('manualSetScore: match ' + matchId + ' → ' + score1 + '-' + score2);
   return true;
 }
@@ -64,6 +90,7 @@ function clearManualOverride(matchId) {
   const i = rows.findIndex((r, idx) => idx > 0 && Number(r[0]) === matchId);
   if (i < 0) return false;
   sheet.getRange(i + 1, 18).setValue('');
+  touchDataVersion();
   Logger.log('clearManualOverride: match ' + matchId + ' unlocked');
   return true;
 }
@@ -81,7 +108,61 @@ function clearAllScores() {
   sheet.getRange(2, 18, numRows, 1).clearContent();                         // manual lock
 
   recalcGroups(); // resets group standings to all-zero
+  touchDataVersion();
   SpreadsheetApp.getUi().alert('Done — all scores cleared, standings reset to 0.');
+}
+
+function normalizeTeamNamesInSheets(showAlert) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const matches = ss.getSheetByName('matches');
+  const groups = ss.getSheetByName('groups');
+  let changed = 0;
+
+  if (matches && matches.getLastRow() > 1) {
+    const lastRow = matches.getLastRow();
+    const teams = matches.getRange(2, 7, lastRow - 1, 6).getValues();
+    teams.forEach(row => {
+      const homeName = normalizeTeamName_(row[1]);
+      const homeFlag = normalizeTeamFlag_(row[0], row[2]);
+      const awayName = normalizeTeamName_(row[4]);
+      const awayFlag = normalizeTeamFlag_(row[3], row[5]);
+      if (homeName !== row[1]) { row[1] = homeName; changed++; }
+      if (homeFlag !== row[2]) { row[2] = homeFlag; changed++; }
+      if (awayName !== row[4]) { row[4] = awayName; changed++; }
+      if (awayFlag !== row[5]) { row[5] = awayFlag; changed++; }
+    });
+    matches.getRange(2, 7, lastRow - 1, 6).setValues(teams);
+  }
+
+  if (groups && groups.getLastRow() > 1) {
+    const lastRow = groups.getLastRow();
+    const teams = groups.getRange(2, 2, lastRow - 1, 3).getValues();
+    teams.forEach(row => {
+      const name = normalizeTeamName_(row[1]);
+      const flag = normalizeTeamFlag_(row[0], row[2]);
+      if (name !== row[1]) { row[1] = name; changed++; }
+      if (flag !== row[2]) { row[2] = flag; changed++; }
+    });
+    groups.getRange(2, 2, lastRow - 1, 3).setValues(teams);
+  }
+
+  if (changed > 0) {
+    touchDataVersion();
+    try { refreshScoreEditorSheet(false); } catch (_) {}
+  }
+
+  if (showAlert !== false) {
+    try { SpreadsheetApp.getUi().alert(`中文譯名已統一，更新 ${changed} 個儲存格。`); } catch (_) {}
+  }
+}
+
+function normalizeTeamName_(name) {
+  const raw = String(name || '').trim();
+  return TEAM_NAME_ALIASES[raw] || raw;
+}
+
+function normalizeTeamFlag_(code, flag) {
+  return TEAM_FLAGS_BY_CODE[String(code || '')] || String(flag || '');
 }
 
 function setupSheetValidation() {
@@ -93,7 +174,7 @@ function setupSheetValidation() {
   // Col O (status): dropdown
   sheet.getRange(2, 15, lastRow - 1, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
-      .requireValueInList(['upcoming', 'finished'], true)
+      .requireValueInList(['upcoming', 'live', 'finished'], true)
       .setAllowInvalid(false)
       .build()
   );
@@ -105,7 +186,8 @@ function setupSheetValidation() {
       .build()
   );
 
-  SpreadsheetApp.getUi().alert('Sheet validation set up ✓\nCol O: dropdown  |  Col R: checkbox\nHeaders added to matches & groups tabs.');
+  Logger.log('Sheet validation set up ✓');
+  try { SpreadsheetApp.getUi().alert('Sheet validation set up ✓'); } catch (_) {}
 }
 
 function setupHeaders() {
@@ -124,6 +206,273 @@ function setupHeaders() {
     'played', 'win', 'draw', 'loss',
     'gf', 'ga', 'gd', 'pts'
   ]]);
+}
+// ─────────────────────────────────────────────
+
+// ── Score editor sheet ───────────────────────
+// Editors use this simplified sheet instead of touching the 18-column matches tab.
+// "主隊", "客隊", "比分" and "狀態" are applied back to matches.
+
+function refreshScoreEditorSheet(showAlert) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const source = ss.getSheetByName('matches');
+  if (!source) throw new Error('matches sheet not found');
+  const teamRows = getEditorTeamRows_(ss);
+  const teamNames = teamRows.map(t => t.name);
+
+  let editor = ss.getSheetByName(SCORE_EDITOR_SHEET);
+  if (!editor) editor = ss.insertSheet(SCORE_EDITOR_SHEET);
+  const existingFilter = editor.getFilter();
+  if (existingFilter) existingFilter.remove();
+  const helperSheetName = '_比分編輯隊伍';
+  let helper = ss.getSheetByName(helperSheetName);
+  if (!helper) {
+    helper = ss.insertSheet(helperSheetName);
+    helper.hideSheet();
+  }
+  helper.clear();
+  if (teamNames.length) helper.getRange(1, 1, teamNames.length, 1).setValues(teamNames.map(name => [name]));
+
+  const rows = source.getDataRange().getValues();
+  rows.shift();
+
+  const values = [[
+    'match_id', '日期', '時間', '階段', '組別',
+    '主隊', '客隊', '比分', '狀態', '場館', '城市', '備註'
+  ]];
+
+  rows
+    .filter(r => r[0] !== '' && r[0] !== null)
+    .forEach(r => {
+      const score = toEditorScore_(r[12], r[13]);
+      values.push([
+        Number(r[0]),
+        formatDate(r[1]),
+        formatTime(r[2]),
+        String(r[3] || ''),
+        String(r[4] || ''),
+        String(r[7] || ''),
+        String(r[10] || ''),
+        score,
+        toEditorStatus_(r[14]),
+        String(r[15] || ''),
+        String(r[16] || ''),
+        ''
+      ]);
+    });
+
+  editor.getRange(1, 1, editor.getMaxRows(), editor.getMaxColumns()).clearDataValidations();
+  editor.clear({ contentsOnly: false });
+  editor.getRange(1, 1, values.length, values[0].length).setValues(values);
+
+  editor.setFrozenRows(1);
+  editor.hideColumns(1);
+  const dataRows = Math.max(values.length - 1, 1);
+  editor.getRange(1, 1, 1, values[0].length)
+    .setFontWeight('bold')
+    .setBackground('#0f4b8f')
+    .setFontColor('#ffffff');
+  editor.getRange(2, 2, dataRows, 1).setNumberFormat('yyyy-mm-dd');
+  editor.getRange(2, 6, dataRows, 4).setBackground('#fff8d6');
+  if (teamNames.length) {
+    editor.getRange(2, 6, dataRows, 2).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireValueInRange(helper.getRange(1, 1, teamNames.length, 1), true)
+        .setAllowInvalid(true)
+        .build()
+    );
+  }
+  editor.getRange(2, 8, dataRows, 1)
+    .setNumberFormat('@')
+    .setNotes(
+    Array.from({ length: dataRows }, () => ['填寫格式：2-1。留空表示沒有比分。'])
+  );
+  editor.getRange(2, 9, dataRows, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['未開賽', '進行中', '已結束'], true)
+      .setAllowInvalid(false)
+      .build()
+  );
+  editor.getRange(1, 1, values.length, values[0].length).createFilter();
+  editor.autoResizeColumns(2, values[0].length - 1);
+  editor.setColumnWidth(6, 220);
+  editor.setColumnWidth(7, 220);
+  editor.setColumnWidth(8, 80);
+  editor.setColumnWidth(12, 180);
+
+  if (showAlert !== false) {
+    try {
+      SpreadsheetApp.getUi().alert('比分編輯分頁已刷新。黃色欄位「主隊 / 客隊 / 比分 / 狀態」可編輯，再執行「套用比分編輯分頁」。');
+    } catch (_) {}
+  }
+}
+
+function applyScoreEditorSheet() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const editor = ss.getSheetByName(SCORE_EDITOR_SHEET);
+  const matches = ss.getSheetByName('matches');
+  if (!editor) throw new Error('請先建立「比分編輯」分頁');
+  if (!matches) throw new Error('matches sheet not found');
+
+  const editorRange = editor.getDataRange();
+  const editorRows = editorRange.getValues();
+  const editorDisplayRows = editorRange.getDisplayValues();
+  if (editorRows.length < 2) {
+    try { SpreadsheetApp.getUi().alert('比分編輯分頁沒有資料。'); } catch (_) {}
+    return;
+  }
+
+  const matchRows = matches.getDataRange().getValues();
+  const teamByName = getEditorTeamMap_(ss);
+  const rowById = {};
+  matchRows.forEach((r, idx) => {
+    if (idx > 0 && r[0] !== '' && r[0] !== null) rowById[Number(r[0])] = idx + 1;
+  });
+
+  const errors = [];
+  let changed = 0;
+
+  editorRows.slice(1).forEach((r, idx) => {
+    const displayRow = editorDisplayRows[idx + 1];
+    const editorRowNum = idx + 2;
+    const matchId = Number(r[0]);
+    if (!matchId) return;
+
+    const targetRow = rowById[matchId];
+    if (!targetRow) {
+      errors.push(`第 ${editorRowNum} 列：match_id ${matchId} 不存在`);
+      return;
+    }
+
+    const homeTeam = parseEditorTeam_(displayRow[5], teamByName, editorRowNum, '主隊');
+    if (homeTeam.error) {
+      errors.push(homeTeam.error);
+      return;
+    }
+
+    const awayTeam = parseEditorTeam_(displayRow[6], teamByName, editorRowNum, '客隊');
+    if (awayTeam.error) {
+      errors.push(awayTeam.error);
+      return;
+    }
+
+    const parsedScore = parseEditorScore_(r[7], editorRowNum, displayRow[7]);
+    if (parsedScore.error) {
+      errors.push(parsedScore.error);
+      return;
+    }
+
+    const status = parseEditorStatus_(displayRow[8], editorRowNum);
+    if (status.error) {
+      errors.push(status.error);
+      return;
+    }
+
+    const currentTeams = matches.getRange(targetRow, 7, 1, 6).getValues()[0];
+    const currentResult = matches.getRange(targetRow, 13, 1, 6).getValues()[0];
+    const nextTeams = [
+      homeTeam.code, homeTeam.name, homeTeam.flag,
+      awayTeam.code, awayTeam.name, awayTeam.flag
+    ];
+    const nextScoreHome = parsedScore.blank ? '' : parsedScore.home;
+    const nextScoreAway = parsedScore.blank ? '' : parsedScore.away;
+    const nextStatus = status.value;
+    const nextManual = !(parsedScore.blank && nextStatus === 'upcoming');
+
+    const same =
+      currentTeams.every((v, i) => String(v || '') === String(nextTeams[i] || '')) &&
+      String(currentResult[0]) === String(nextScoreHome) &&
+      String(currentResult[1]) === String(nextScoreAway) &&
+      String(currentResult[2] || 'upcoming') === nextStatus &&
+      Boolean(currentResult[5]) === nextManual;
+
+    if (same) return;
+
+    matches.getRange(targetRow, 7, 1, 6).setValues([nextTeams]);
+    matches.getRange(targetRow, 13, 1, 3).setValues([[nextScoreHome, nextScoreAway, nextStatus]]);
+    matches.getRange(targetRow, 18).setValue(nextManual);
+    changed++;
+  });
+
+  if (errors.length) {
+    SpreadsheetApp.getUi().alert('套用失敗，請修正後再試：\n\n' + errors.slice(0, 20).join('\n'));
+    return;
+  }
+
+  if (changed > 0) {
+    recalcGroups();
+    touchDataVersion();
+    refreshScoreEditorSheet(false);
+  }
+
+  try {
+    SpreadsheetApp.getUi().alert(`已套用 ${changed} 場比賽。${changed ? '前台資料已更新。' : '沒有偵測到變更。'}`);
+  } catch (_) {}
+}
+
+function getEditorTeamRows_(ss) {
+  const groups = ss.getSheetByName('groups');
+  if (!groups) return [];
+  const rows = groups.getDataRange().getValues();
+  rows.shift();
+  return rows
+    .filter(r => r[1] && r[2])
+    .map(r => ({ code: String(r[1]), name: normalizeTeamName_(r[2]), flag: String(r[3] || '') }));
+}
+
+function getEditorTeamMap_(ss) {
+  const map = {};
+  getEditorTeamRows_(ss).forEach(t => {
+    map[t.name] = t;
+    map[t.code] = t;
+    if (t.flag) map[`${t.flag} ${t.name}`] = t;
+  });
+  return map;
+}
+
+function parseEditorTeam_(value, teamByName, rowNum, label) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === '待定') return { code: '', name: '', flag: '' };
+  const team = teamByName[raw];
+  if (!team) return { error: `第 ${rowNum} 列：${label}「${raw}」不在 groups 隊伍清單內` };
+  return team;
+}
+
+function toEditorScore_(home, away) {
+  if (home === '' || home === null || home === undefined || away === '' || away === null || away === undefined) return '';
+  return `${Number(home)}-${Number(away)}`;
+}
+
+function toEditorStatus_(status) {
+  const map = { upcoming: '未開賽', live: '進行中', finished: '已結束' };
+  return map[String(status || 'upcoming')] || '未開賽';
+}
+
+function parseEditorStatus_(value, rowNum) {
+  const raw = String(value || '').trim();
+  const map = {
+    '未開賽': 'upcoming',
+    '進行中': 'live',
+    '已結束': 'finished',
+    upcoming: 'upcoming',
+    live: 'live',
+    finished: 'finished'
+  };
+  const status = map[raw] || (raw ? null : 'upcoming');
+  if (!status) return { error: `第 ${rowNum} 列：狀態只能填「未開賽 / 進行中 / 已結束」` };
+  return { value: status };
+}
+
+function parseEditorScore_(value, rowNum, displayValue) {
+  if (value instanceof Date) {
+    return { blank: false, home: value.getMonth() + 1, away: value.getDate() };
+  }
+
+  const raw = String(displayValue || value || '').trim();
+  if (!raw) return { blank: true };
+  const match = raw.match(/^(\d+)\s*[-:：/／]\s*(\d+)$/);
+  if (!match) return { error: `第 ${rowNum} 列：比分格式請填 2-1` };
+  return { blank: false, home: Number(match[1]), away: Number(match[2]) };
 }
 // ─────────────────────────────────────────────
 
@@ -204,7 +553,81 @@ function syncScores() {
   });
 
   Logger.log(`syncScores: ${updated} matches updated`);
-  if (updated > 0) recalcGroups();
+  if (updated > 0) {
+    recalcGroups();
+    touchDataVersion();
+  }
+  syncBracket(); // also fill in knockout teams when bracket is set
+}
+
+// ── syncBracket ───────────────────────────────
+// Fills in team names for knockout matches (TBD rows) using football-data.org.
+// Runs automatically at the end of syncScores().
+
+function syncBracket() {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('FD_API_KEY');
+  if (!apiKey) { Logger.log('syncBracket: no API key'); return 0; }
+
+  const resp = UrlFetchApp.fetch(
+    'https://api.football-data.org/v4/competitions/WC/matches',
+    { headers: { 'X-Auth-Token': apiKey }, muteHttpExceptions: true }
+  );
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('syncBracket API error ' + resp.getResponseCode()); return 0;
+  }
+
+  const apiMatches = JSON.parse(resp.getContentText()).matches;
+
+  // Build lookup: UTC+8 "YYYY-MM-DD_HH:MM" → API match
+  const byDateTime = {};
+  apiMatches.forEach(m => {
+    const d  = new Date(new Date(m.utcDate).getTime() + 8 * 3600000);
+    const dt = d.toISOString().slice(0, 10) + '_' +
+               String(d.getUTCHours()).padStart(2, '0') + ':' +
+               String(d.getUTCMinutes()).padStart(2, '0');
+    byDateTime[dt] = m;
+  });
+
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+  const rows  = sheet.getDataRange().getValues();
+
+  // Build TLA → Chinese team data from known group-stage rows
+  const teamByTla = {};
+  rows.slice(1).forEach(row => {
+    const c1 = String(row[6]||''), n1 = String(row[7]||''), f1 = String(row[8]||'');
+    const c2 = String(row[9]||''), n2 = String(row[10]||''), f2 = String(row[11]||'');
+    if (c1 && n1) teamByTla[fdCode(c1)] = { code: c1, name: n1, flag: f1 };
+    if (c2 && n2) teamByTla[fdCode(c2)] = { code: c2, name: n2, flag: f2 };
+  });
+
+  let updated = 0;
+  rows.slice(1).forEach((row, i) => {
+    if (!row[0])          return; // empty row
+    if (row[6])           return; // already has home team — skip
+    if (row[17] === true) return; // manual lock
+
+    const date = formatDate(row[1]);
+    const time = formatTime(row[2]);
+    if (!date || !time) return;
+
+    const apiMatch = byDateTime[`${date}_${time}`];
+    if (!apiMatch) return;
+
+    const t1 = teamByTla[apiMatch.homeTeam.tla];
+    const t2 = teamByTla[apiMatch.awayTeam.tla];
+    if (!t1 || !t2) return; // unrecognised TLA (e.g. TBD in API too)
+
+    sheet.getRange(i + 2, 7, 1, 6).setValues([[
+      t1.code, t1.name, t1.flag,
+      t2.code, t2.name, t2.flag
+    ]]);
+    updated++;
+    Logger.log(`syncBracket: #${row[0]} → ${t1.name} vs ${t2.name}`);
+  });
+
+  if (updated > 0) touchDataVersion();
+  Logger.log(`syncBracket: ${updated} matches updated`);
+  return updated;
 }
 
 function setupSyncTrigger() {
@@ -258,10 +681,11 @@ function doPost(e) {
 
     sheet.getRange(i + 1, 18).setValue(true);
 
-    if (d.status === 'finished') recalcGroups();
+    recalcGroups();
+    touchDataVersion();
 
     return ContentService
-      .createTextOutput(JSON.stringify({ status: 'ok', match_id: d.match_id }))
+      .createTextOutput(JSON.stringify({ status: 'ok', match_id: d.match_id, updated: getDataVersion() }))
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -287,11 +711,36 @@ function updateMatchFromGet(p) {
   if (p.status)
     sheet.getRange(i + 1, 15).setValue(p.status);
 
+  // Knockout team fields
+  if (p.team1_code !== undefined) sheet.getRange(i + 1, 7).setValue(p.team1_code);
+  if (p.team1_name !== undefined) sheet.getRange(i + 1, 8).setValue(p.team1_name);
+  if (p.team1_flag !== undefined) sheet.getRange(i + 1, 9).setValue(p.team1_flag);
+  if (p.team2_code !== undefined) sheet.getRange(i + 1, 10).setValue(p.team2_code);
+  if (p.team2_name !== undefined) sheet.getRange(i + 1, 11).setValue(p.team2_name);
+  if (p.team2_flag !== undefined) sheet.getRange(i + 1, 12).setValue(p.team2_flag);
+
   sheet.getRange(i + 1, 18).setValue(true);
 
-  if (p.status === 'finished') recalcGroups();
+  recalcGroups();
+  touchDataVersion();
 
-  return { status: 'ok', match_id: matchId };
+  return { status: 'ok', match_id: matchId, updated: getDataVersion() };
+}
+
+function testDiag() {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
+    const rows  = sheet.getDataRange().getValues();
+    const total = rows.length;
+    const ids   = rows.slice(1, 6).map(r => r[0]);   // first 5 match IDs
+    const i     = rows.findIndex((r, idx) => idx > 0 && Number(r[0]) === 90);
+    Logger.log('rows=' + total + '  first IDs=' + ids + '  match90_idx=' + i);
+    if (i > 0) {
+      sheet.getRange(i + 1, 8).setValue('診斷寫入OK');
+      SpreadsheetApp.flush();
+      Logger.log('Wrote to H' + (i+1));
+    }
+  } catch(e) { Logger.log('ERROR: ' + e.message); }
 }
 
 // ─── getMatches ───────────────────────────────
@@ -310,8 +759,8 @@ function getMatches(params) {
       phase:     String(r[3] || ''),
       group:     String(r[4] || ''),
       round:     Number(r[5]) || 0,
-      team1: { code: String(r[6] || ''), name: String(r[7] || ''), flag: String(r[8] || '') },
-      team2: { code: String(r[9] || ''), name: String(r[10] || ''), flag: String(r[11] || '') },
+      team1: { code: String(r[6] || ''), name: normalizeTeamName_(r[7]), flag: normalizeTeamFlag_(r[6], r[8]) },
+      team2: { code: String(r[9] || ''), name: normalizeTeamName_(r[10]), flag: normalizeTeamFlag_(r[9], r[11]) },
       score1: toScore(r[12]),
       score2: toScore(r[13]),
       status: String(r[14] || 'upcoming'),
@@ -324,7 +773,7 @@ function getMatches(params) {
 
   return {
     status:  'ok',
-    updated: new Date().toISOString(),
+    updated: getDataVersion(),
     data
   };
 }
@@ -340,7 +789,7 @@ function getGroups(params) {
     .filter(r => r[0] !== '' && r[0] !== null)
     .map(r => ({
       group: String(r[0]),
-      team:  { code: String(r[1] || ''), name: String(r[2] || ''), flag: String(r[3] || '') },
+      team:  { code: String(r[1] || ''), name: normalizeTeamName_(r[2]), flag: normalizeTeamFlag_(r[1], r[3]) },
       played: Number(r[4])  || 0,
       win:    Number(r[5])  || 0,
       draw:   Number(r[6])  || 0,
@@ -355,7 +804,7 @@ function getGroups(params) {
 
   return {
     status:  'ok',
-    updated: new Date().toISOString(),
+    updated: getDataVersion(),
     data
   };
 }
@@ -370,12 +819,25 @@ function getConfig() {
 
   return {
     status:  'ok',
-    updated: new Date().toISOString(),
+    updated: getDataVersion(),
     data:    cfg
   };
 }
 
 // ─── Helpers ──────────────────────────────────
+
+function touchDataVersion() {
+  const updated = new Date().toISOString();
+  PropertiesService.getScriptProperties().setProperty('DATA_UPDATED_AT', updated);
+  const cache = CacheService.getScriptCache();
+  ['matches_all', 'groups_all', 'config_all'].forEach(key => cache.remove(key));
+  SpreadsheetApp.flush();
+  return updated;
+}
+
+function getDataVersion() {
+  return PropertiesService.getScriptProperties().getProperty('DATA_UPDATED_AT') || new Date().toISOString();
+}
 
 function toScore(value) {
   if (value === '' || value === null || value === undefined) return null;
@@ -506,9 +968,9 @@ function initializeMatches() {
     [4,  '2026-06-13', '09:00', '小組賽', 'C', 1, 'USA', '美國',   '🇺🇸', 'PAR', '巴拉圭',     '🇵🇾', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
     [5,  '2026-06-14', '03:00', '小組賽', 'B', 1, 'QAT', '卡達',   '🇶🇦', 'SUI', '瑞士',       '🇨🇭', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
     [6,  '2026-06-14', '06:00', '小組賽', 'D', 1, 'BRA', '巴西',   '🇧🇷', 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
-    [7,  '2026-06-14', '09:00', '小組賽', 'D', 1, 'HAI', '海地',   '🇭🇹', 'SCO', '蘇格蘭',     '🏴󠁧󠁢󠁳󠁣󠁴󠁿', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [7,  '2026-06-14', '09:00', '小組賽', 'D', 1, 'HAI', '海地',   '🇭🇹', 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
     [8,  '2026-06-14', '12:00', '小組賽', 'C', 1, 'AUS', '澳洲',   '🇦🇺', 'TUR', '土耳其',     '🇹🇷', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
-    [9,  '2026-06-15', '01:00', '小組賽', 'E', 1, 'GER', '德國',   '🇩🇪', 'CUW', '庫拉索',     '🇨🇼', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
+    [9,  '2026-06-15', '01:00', '小組賽', 'E', 1, 'GER', '德國',   '🇩🇪', 'CUW', '古拉索',     '🇨🇼', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
     [10, '2026-06-15', '04:00', '小組賽', 'F', 1, 'NED', '荷蘭',   '🇳🇱', 'JPN', '日本',       '🇯🇵', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     [11, '2026-06-15', '07:00', '小組賽', 'E', 1, 'CIV', '象牙海岸','🇨🇮', 'ECU', '厄瓜多',     '🇪🇨', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
     [12, '2026-06-15', '10:00', '小組賽', 'F', 1, 'SWE', '瑞典',   '🇸🇪', 'TUN', '突尼西亞',   '🇹🇳', '', '', 'upcoming', 'Estadio BBVA',                       '蒙特雷'],
@@ -520,8 +982,8 @@ function initializeMatches() {
     [18, '2026-06-17', '06:00', '小組賽', 'J', 1, 'IRQ', '伊拉克', '🇮🇶', 'NOR', '挪威',       '🇳🇴', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
     [19, '2026-06-17', '09:00', '小組賽', 'I', 1, 'ARG', '阿根廷', '🇦🇷', 'ALG', '阿爾及利亞', '🇩🇿', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
     [20, '2026-06-17', '12:00', '小組賽', 'I', 1, 'AUT', '奧地利', '🇦🇹', 'JOR', '約旦',       '🇯🇴', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
-    [21, '2026-06-18', '01:00', '小組賽', 'L', 1, 'POR', '葡萄牙', '🇵🇹', 'CGO', '剛果',       '🇨🇩', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
-    [22, '2026-06-18', '04:00', '小組賽', 'K', 1, 'ENG', '英格蘭', '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
+    [21, '2026-06-18', '01:00', '小組賽', 'L', 1, 'POR', '葡萄牙', '🇵🇹', 'CGO', '民主剛果',       '🇨🇩', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
+    [22, '2026-06-18', '04:00', '小組賽', 'K', 1, 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     [23, '2026-06-18', '07:00', '小組賽', 'K', 1, 'GHA', '迦納',   '🇬🇭', 'PAN', '巴拿馬',     '🇵🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
     [24, '2026-06-18', '10:00', '小組賽', 'L', 1, 'UZB', '烏茲別克','🇺🇿','COL', '哥倫比亞',   '🇨🇴', '', '', 'upcoming', 'Estadio Banorte',                    '墨西哥城'],
     // ── GROUP STAGE - MATCHDAY 2 ──────────────────────────────────────────────
@@ -530,12 +992,12 @@ function initializeMatches() {
     [27, '2026-06-19', '06:00', '小組賽', 'B', 2, 'CAN', '加拿大', '🇨🇦', 'QAT', '卡達',       '🇶🇦', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
     [28, '2026-06-19', '09:00', '小組賽', 'A', 2, 'MEX', '墨西哥', '🇲🇽', 'KOR', '韓國',       '🇰🇷', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
     [29, '2026-06-20', '03:00', '小組賽', 'C', 2, 'USA', '美國',   '🇺🇸', 'AUS', '澳洲',       '🇦🇺', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
-    [30, '2026-06-20', '06:00', '小組賽', 'D', 2, 'SCO', '蘇格蘭', '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [30, '2026-06-20', '06:00', '小組賽', 'D', 2, 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
     [31, '2026-06-20', '08:30', '小組賽', 'D', 2, 'BRA', '巴西',   '🇧🇷', 'HAI', '海地',       '🇭🇹', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
     [32, '2026-06-20', '11:00', '小組賽', 'C', 2, 'TUR', '土耳其', '🇹🇷', 'PAR', '巴拉圭',     '🇵🇾', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
     [33, '2026-06-21', '01:00', '小組賽', 'F', 2, 'NED', '荷蘭',   '🇳🇱', 'SWE', '瑞典',       '🇸🇪', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
     [34, '2026-06-21', '04:00', '小組賽', 'E', 2, 'GER', '德國',   '🇩🇪', 'CIV', '象牙海岸',   '🇨🇮', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
-    [35, '2026-06-21', '08:00', '小組賽', 'E', 2, 'ECU', '厄瓜多', '🇪🇨', 'CUW', '庫拉索',     '🇨🇼', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
+    [35, '2026-06-21', '08:00', '小組賽', 'E', 2, 'ECU', '厄瓜多', '🇪🇨', 'CUW', '古拉索',     '🇨🇼', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
     [36, '2026-06-21', '12:00', '小組賽', 'F', 2, 'TUN', '突尼西亞','🇹🇳','JPN', '日本',       '🇯🇵', '', '', 'upcoming', 'Estadio BBVA',                       '蒙特雷'],
     [37, '2026-06-22', '00:00', '小組賽', 'G', 2, 'ESP', '西班牙', '🇪🇸', 'KSA', '沙烏地阿拉伯','🇸🇦','', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
     [38, '2026-06-22', '03:00', '小組賽', 'H', 2, 'BEL', '比利時', '🇧🇪', 'IRN', '伊朗',       '🇮🇷', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
@@ -546,17 +1008,17 @@ function initializeMatches() {
     [43, '2026-06-23', '08:00', '小組賽', 'J', 2, 'SEN', '塞內加爾','🇸🇳','NOR', '挪威',       '🇳🇴', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
     [44, '2026-06-23', '11:00', '小組賽', 'I', 2, 'ALG', '阿爾及利亞','🇩🇿','JOR','約旦',      '🇯🇴', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
     [45, '2026-06-24', '01:00', '小組賽', 'L', 2, 'POR', '葡萄牙', '🇵🇹', 'UZB', '烏茲別克',   '🇺🇿', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
-    [46, '2026-06-24', '04:00', '小組賽', 'K', 2, 'ENG', '英格蘭', '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'GHA', '迦納',       '🇬🇭', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [46, '2026-06-24', '04:00', '小組賽', 'K', 2, 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, 'GHA', '迦納',       '🇬🇭', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
     [47, '2026-06-24', '07:00', '小組賽', 'K', 2, 'CRO', '克羅埃西亞','🇭🇷','PAN','巴拿馬',    '🇵🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
-    [48, '2026-06-24', '10:00', '小組賽', 'L', 2, 'COL', '哥倫比亞','🇨🇴','CGO','剛果',        '🇨🇩', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
+    [48, '2026-06-24', '10:00', '小組賽', 'L', 2, 'COL', '哥倫比亞','🇨🇴','CGO','民主剛果',        '🇨🇩', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
     // ── GROUP STAGE - MATCHDAY 3 ──────────────────────────────────────────────
     [49, '2026-06-25', '03:00', '小組賽', 'B', 3, 'BIH', '波赫','🇧🇦','QAT', '卡達',       '🇶🇦', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
     [50, '2026-06-25', '03:00', '小組賽', 'B', 3, 'SUI', '瑞士',   '🇨🇭', 'CAN', '加拿大',     '🇨🇦', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
     [51, '2026-06-25', '06:00', '小組賽', 'D', 3, 'MAR', '摩洛哥', '🇲🇦', 'HAI', '海地',       '🇭🇹', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
-    [52, '2026-06-25', '06:00', '小組賽', 'D', 3, 'BRA', '巴西',   '🇧🇷', 'SCO', '蘇格蘭',     '🏴󠁧󠁢󠁳󠁣󠁴󠁿', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
+    [52, '2026-06-25', '06:00', '小組賽', 'D', 3, 'BRA', '巴西',   '🇧🇷', 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
     [53, '2026-06-25', '09:00', '小組賽', 'A', 3, 'MEX', '墨西哥', '🇲🇽', 'CZE', '捷克',       '🇨🇿', '', '', 'upcoming', 'Estadio Banorte',                    '墨西哥城'],
     [54, '2026-06-25', '09:00', '小組賽', 'A', 3, 'KOR', '韓國',   '🇰🇷', 'RSA', '南非',       '🇿🇦', '', '', 'upcoming', 'Estadio BBVA',                       '蒙特雷'],
-    [55, '2026-06-26', '04:00', '小組賽', 'E', 3, 'CUW', '庫拉索', '🇨🇼', 'CIV', '象牙海岸',   '🇨🇮', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
+    [55, '2026-06-26', '04:00', '小組賽', 'E', 3, 'CUW', '古拉索', '🇨🇼', 'CIV', '象牙海岸',   '🇨🇮', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
     [56, '2026-06-26', '04:00', '小組賽', 'E', 3, 'ECU', '厄瓜多', '🇪🇨', 'GER', '德國',       '🇩🇪', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
     [57, '2026-06-26', '07:00', '小組賽', 'F', 3, 'JPN', '日本',   '🇯🇵', 'SWE', '瑞典',       '🇸🇪', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     [58, '2026-06-26', '07:00', '小組賽', 'F', 3, 'TUN', '突尼西亞','🇹🇳','NED', '荷蘭',       '🇳🇱', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
@@ -569,9 +1031,9 @@ function initializeMatches() {
     [65, '2026-06-27', '11:00', '小組賽', 'H', 3, 'EGY', '埃及',   '🇪🇬', 'IRN', '伊朗',       '🇮🇷', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
     [66, '2026-06-27', '11:00', '小組賽', 'H', 3, 'NZL', '紐西蘭', '🇳🇿', 'BEL', '比利時',     '🇧🇪', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
     [67, '2026-06-28', '05:00', '小組賽', 'K', 3, 'GHA', '迦納',   '🇬🇭', 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
-    [68, '2026-06-28', '05:00', '小組賽', 'K', 3, 'PAN', '巴拿馬', '🇵🇦', 'ENG', '英格蘭',     '🏴󠁧󠁢󠁥󠁮󠁧󠁿', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
+    [68, '2026-06-28', '05:00', '小組賽', 'K', 3, 'PAN', '巴拿馬', '🇵🇦', 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
     [69, '2026-06-28', '07:30', '小組賽', 'L', 3, 'COL', '哥倫比亞','🇨🇴','POR', '葡萄牙',     '🇵🇹', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
-    [70, '2026-06-28', '07:30', '小組賽', 'L', 3, 'UZB', '烏茲別克','🇺🇿','CGO','剛果',        '🇨🇩', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
+    [70, '2026-06-28', '07:30', '小組賽', 'L', 3, 'UZB', '烏茲別克','🇺🇿','CGO','民主剛果',        '🇨🇩', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
     [71, '2026-06-28', '10:00', '小組賽', 'I', 3, 'ALG', '阿爾及利亞','🇩🇿','AUT','奧地利',    '🇦🇹', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
     [72, '2026-06-28', '10:00', '小組賽', 'I', 3, 'JOR', '約旦',   '🇯🇴', 'ARG', '阿根廷',     '🇦🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     // ── ROUND OF 32 ───────────────────────────────────────────────────────────
@@ -648,12 +1110,12 @@ function initializeGroups() {
     ['D', 'BRA', '巴西',   '🇧🇷', 0, 0, 0, 0, 0, 0, 0, 0],
     ['D', 'MAR', '摩洛哥', '🇲🇦', 0, 0, 0, 0, 0, 0, 0, 0],
     ['D', 'HAI', '海地',   '🇭🇹', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['D', 'SCO', '蘇格蘭', '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['D', 'SCO', '蘇格蘭', TEAM_FLAGS_BY_CODE.SCO, 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group E ───────────────────────────────────────────────────────────────
     ['E', 'GER', '德國',     '🇩🇪', 0, 0, 0, 0, 0, 0, 0, 0],
     ['E', 'CIV', '象牙海岸', '🇨🇮', 0, 0, 0, 0, 0, 0, 0, 0],
     ['E', 'ECU', '厄瓜多',   '🇪🇨', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['E', 'CUW', '庫拉索',   '🇨🇼', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['E', 'CUW', '古拉索',   '🇨🇼', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group F ───────────────────────────────────────────────────────────────
     ['F', 'NED', '荷蘭',     '🇳🇱', 0, 0, 0, 0, 0, 0, 0, 0],
     ['F', 'JPN', '日本',     '🇯🇵', 0, 0, 0, 0, 0, 0, 0, 0],
@@ -680,7 +1142,7 @@ function initializeGroups() {
     ['J', 'IRQ', '伊拉克',   '🇮🇶', 0, 0, 0, 0, 0, 0, 0, 0],
     ['J', 'NOR', '挪威',     '🇳🇴', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group K ───────────────────────────────────────────────────────────────
-    ['K', 'ENG', '英格蘭',   '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['K', 'ENG', '英格蘭',   TEAM_FLAGS_BY_CODE.ENG, 0, 0, 0, 0, 0, 0, 0, 0],
     ['K', 'GHA', '迦納',     '🇬🇭', 0, 0, 0, 0, 0, 0, 0, 0],
     ['K', 'PAN', '巴拿馬',   '🇵🇦', 0, 0, 0, 0, 0, 0, 0, 0],
     ['K', 'CRO', '克羅埃西亞','🇭🇷', 0, 0, 0, 0, 0, 0, 0, 0],
@@ -688,7 +1150,7 @@ function initializeGroups() {
     ['L', 'POR', '葡萄牙',   '🇵🇹', 0, 0, 0, 0, 0, 0, 0, 0],
     ['L', 'UZB', '烏茲別克', '🇺🇿', 0, 0, 0, 0, 0, 0, 0, 0],
     ['L', 'COL', '哥倫比亞', '🇨🇴', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['L', 'CGO', '剛果',     '🇨🇩', 0, 0, 0, 0, 0, 0, 0, 0]
+    ['L', 'CGO', '民主剛果',     '🇨🇩', 0, 0, 0, 0, 0, 0, 0, 0]
   ];
 
   if (data.length > 0) sheet.getRange(2, 1, data.length, 12).setValues(data);

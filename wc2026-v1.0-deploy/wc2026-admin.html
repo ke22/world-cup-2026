@@ -160,6 +160,21 @@ body {
 .card-feedback.ok { color: var(--green); }
 .card-feedback.err { color: var(--red); }
 
+/* KO team inputs */
+.card-ko-teams {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-bottom: 10px;
+}
+.ko-team-row { display: flex; align-items: center; gap: 8px; }
+.ko-team-label { font-size: 0.75rem; color: var(--muted); width: 30px; flex-shrink: 0; }
+.ko-team-input {
+  flex: 1; height: 32px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface-2); color: var(--fg);
+  font-size: 0.82rem; font-family: inherit;
+}
+.ko-team-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; background: #fff; }
+
 /* State messages */
 .state-msg {
   text-align: center; padding: 40px 20px;
@@ -209,6 +224,31 @@ body {
   transition: background 0.12s;
 }
 .reload-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* API Status Bar */
+.api-bar {
+  background: var(--surface-2);
+  border: 1px solid var(--border); border-top: none;
+  padding: 8px 16px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.api-bar-title { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.api-pill {
+  font-size: 0.75rem; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px;
+  background: #e5e7eb; color: #6b7280;
+  transition: background 0.2s, color 0.2s;
+}
+.api-pill.ok  { background: var(--green-soft); color: var(--green); }
+.api-pill.err { background: var(--red-soft);   color: var(--red); }
+.api-recheck {
+  margin-left: auto; height: 26px; padding: 0 10px;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted);
+  font-size: 0.72rem; cursor: pointer; font-family: inherit;
+}
+.api-recheck:hover { border-color: var(--accent); color: var(--accent); }
+
 </style>
 </head>
 <body>
@@ -218,6 +258,15 @@ body {
     <span class="page-header-title">⚽ WC2026 比分管理</span>
     <span class="page-header-sub" id="last-updated"></span>
   </header>
+
+  <!-- API Status Bar -->
+  <div class="api-bar">
+    <span class="api-bar-title">API 連線</span>
+    <span class="api-pill" id="api-matches">⏳ 賽程</span>
+    <span class="api-pill" id="api-groups">⏳ 積分</span>
+    <span class="api-pill" id="api-config">⏳ 設定</span>
+    <button class="api-recheck" onclick="checkApis()">↺ 重新檢測</button>
+  </div>
 
   <div class="date-nav" id="date-nav">
     <button class="date-btn" id="btn-today" onclick="setRelDay(0)">今天</button>
@@ -229,6 +278,7 @@ body {
   <div class="match-list" id="match-list">
     <div class="state-msg">載入中…</div>
   </div>
+  <datalist id="teams-list"></datalist>
 
   <!-- Preview -->
   <div class="preview-section">
@@ -249,8 +299,8 @@ body {
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
-const BASE    = 'https://ke22.github.io/world-cup-2026';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
+const BASE    = 'https://www.cna.com.tw/missions/embed/wc2026';
 
 const PREVIEW_SRCS = {
   schedule: `${BASE}/wc2026-schedule.html`,
@@ -258,11 +308,20 @@ const PREVIEW_SRCS = {
   bracket:  `${BASE}/wc2026-bracket.html`,
 };
 
-const CACHE_KEYS = ['wc26_matches', 'wc26_groups', 'wc26_bracket'];
+const CACHE_KEYS = ['wc26_all', 'wc26_groups'];
 
 let currentDate  = todayUTC8();
 let currentPreview = 'schedule';
 let allMatches   = [];
+let teamsMap     = {};
+
+function clearWidgetCache() {
+  CACHE_KEYS.forEach(k => localStorage.removeItem(k));
+}
+
+function notifyWidgetsToRefresh() {
+  try { localStorage.setItem('wc26_refresh_token', String(Date.now())); } catch {}
+}
 
 /* ── Date helpers ── */
 function todayUTC8() {
@@ -288,12 +347,26 @@ function setDate(dateStr) {
 }
 
 /* ── Fetch + render ── */
+function buildTeamsMap() {
+  const map = {};
+  allMatches.forEach(m => {
+    if (m.phase === '小組賽') {
+      if (m.team1.name) map[m.team1.name] = { code: m.team1.code, flag: m.team1.flag };
+      if (m.team2.name) map[m.team2.name] = { code: m.team2.code, flag: m.team2.flag };
+    }
+  });
+  return map;
+}
+
 async function loadMatches() {
   try {
-    const res  = await fetch(`${GAS_URL}?action=getMatches`);
+    const res  = await fetch(`${GAS_URL}?action=getMatches&_=${Date.now()}`);
     const json = await res.json();
     if (json.status !== 'ok') throw new Error(json.message);
     allMatches = json.data;
+    teamsMap   = buildTeamsMap();
+    const dl   = document.getElementById('teams-list');
+    if (dl) dl.innerHTML = Object.keys(teamsMap).map(n => `<option value="${n}">`).join('');
     document.getElementById('last-updated').textContent = '資料時間 ' + new Date(json.updated).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
     renderMatches();
   } catch (err) {
@@ -313,6 +386,7 @@ function renderMatches() {
   }
 
   list.innerHTML = matches.map(m => {
+    const isKo = m.phase !== '小組賽';
     const n1 = m.team1.name || m.team1.code || '待定';
     const n2 = m.team2.name || m.team2.code || '待定';
     const f1 = m.team1.flag || '';
@@ -323,6 +397,19 @@ function renderMatches() {
                   m.group ? m.group + '組' : m.phase || '',
                   m.venue || '', m.city || ''].filter(Boolean).join(' · ');
     const liveClass = m.status === 'live' ? ' live' : m.status === 'finished' ? ' finished' : '';
+    const koHtml = isKo ? `
+      <div class="card-ko-teams">
+        <div class="ko-team-row">
+          <span class="ko-team-label">主隊</span>
+          <input class="ko-team-input" id="kn1-${m.match_id}"
+            value="${m.team1.name || ''}" list="teams-list" placeholder="輸入主隊名…" autocomplete="off">
+        </div>
+        <div class="ko-team-row">
+          <span class="ko-team-label">客隊</span>
+          <input class="ko-team-input" id="kn2-${m.match_id}"
+            value="${m.team2.name || ''}" list="teams-list" placeholder="輸入客隊名…" autocomplete="off">
+        </div>
+      </div>` : '';
     return `
       <div class="match-card" id="card-${m.match_id}">
         <div class="card-meta">${meta}</div>
@@ -343,6 +430,7 @@ function renderMatches() {
             <span class="card-name">${n2}</span>
           </div>
         </div>
+        ${koHtml}
         <div class="card-controls">
           <span class="status-label">狀態：</span>
           <select class="status-select${liveClass}" id="st-${m.match_id}"
@@ -384,6 +472,18 @@ async function saveMatch(matchId) {
     if (s1 !== '') params.set('score1', s1);
     if (s2 !== '') params.set('score2', s2);
     if (st)        params.set('status', st);
+
+    // KO team fields (only present for non-group-stage matches)
+    const kn1El = document.getElementById(`kn1-${matchId}`);
+    const kn2El = document.getElementById(`kn2-${matchId}`);
+    if (kn1El) {
+      const n1 = kn1El.value.trim(), n2 = kn2El.value.trim();
+      const t1 = teamsMap[n1] || {}, t2 = teamsMap[n2] || {};
+      params.set('team1_name', n1); params.set('team1_flag', t1.flag || ''); params.set('team1_code', t1.code || '');
+      params.set('team2_name', n2); params.set('team2_flag', t2.flag || ''); params.set('team2_code', t2.code || '');
+    }
+
+    params.set('_', Date.now());
     const res = await fetch(`${GAS_URL}?${params}`);
     const json = await res.json();
     if (json.status !== 'ok') throw new Error(json.message || '儲存失敗');
@@ -394,10 +494,17 @@ async function saveMatch(matchId) {
       if (s1 !== '') m.score1 = Number(s1);
       if (s2 !== '') m.score2 = Number(s2);
       m.status = st;
+      if (kn1El) {
+        const n1 = kn1El.value.trim(), n2 = kn2El.value.trim();
+        const t1 = teamsMap[n1] || {}, t2 = teamsMap[n2] || {};
+        m.team1 = { name: n1, flag: t1.flag || '', code: t1.code || '' };
+        m.team2 = { name: n2, flag: t2.flag || '', code: t2.code || '' };
+      }
     }
 
     // Clear widget cache + reload preview
-    CACHE_KEYS.forEach(k => localStorage.removeItem(k));
+    clearWidgetCache();
+    notifyWidgetsToRefresh();
     reloadPreview();
 
     card.classList.add('saved');
@@ -412,6 +519,30 @@ async function saveMatch(matchId) {
   } finally {
     btn.disabled    = false;
     btn.textContent = '💾 儲存';
+  }
+}
+
+/* ── API Check ── */
+async function checkApis() {
+  const checks = [
+    { id: 'api-matches', action: 'getMatches', label: '賽程' },
+    { id: 'api-groups',  action: 'getGroups',  label: '積分' },
+    { id: 'api-config',  action: 'getConfig',  label: '設定' },
+  ];
+  checks.forEach(c => {
+    const el = document.getElementById(c.id);
+    el.className = 'api-pill'; el.textContent = '⏳ ' + c.label;
+  });
+  for (const c of checks) {
+    const el = document.getElementById(c.id);
+    try {
+      const res  = await fetch(`${GAS_URL}?action=${c.action}&_=${Date.now()}`);
+      const json = await res.json();
+      if (json.status === 'ok') { el.className = 'api-pill ok'; el.textContent = '✓ ' + c.label; }
+      else throw new Error(json.message);
+    } catch (err) {
+      el.className = 'api-pill err'; el.textContent = '✗ ' + c.label; el.title = err.message;
+    }
   }
 }
 
@@ -446,9 +577,8 @@ window.addEventListener('message', e => {
   const today = todayUTC8();
   document.getElementById('date-picker').value = today;
   document.getElementById('btn-today').classList.add('active');
-  // Load preview immediately
   reloadPreview();
-  // Load match data
+  checkApis();
   loadMatches();
 })();
 </script>

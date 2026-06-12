@@ -419,11 +419,15 @@ body {
 /* ── Match node card ── */
 .match-node {
   flex: 1;
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 7px;
   overflow: hidden;
   box-shadow: 0 1px 4px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
 }
 .match-node.live     { border-color: rgba(214,50,0,0.3); background: #fff8f5; }
 .match-node.finished { opacity: 0.88; }
@@ -431,17 +435,19 @@ body {
 /* Team row */
 .mn-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  padding: 5px 7px;
-  gap: 5px;
+  padding: 2px 3px;
+  gap: 2px;
+  min-width: 0;
   border-bottom: 1px solid rgba(15,50,96,0.05);
 }
 .mn-row:last-of-type { border-bottom: none; }
 
-.mn-flag  { font-size: 14px; flex-shrink: 0; line-height: 1; }
-.mn-name  { flex: 1; font-size: 0.72rem; font-weight: 700; color: var(--fg); line-height: 1.25; word-break: break-all; }
-.mn-name.seed { font-size: 11px; font-weight: 600; color: var(--accent-2); font-style: normal; }
-.mn-name.tbd  { font-size: 11px; color: var(--muted); font-weight: 400; font-style: italic; }
+.mn-flag  { font-size: 0.75rem; flex-shrink: 0; line-height: 1; }
+.mn-name  { flex: 1; font-size: 0.55rem; font-weight: 600; color: var(--fg); min-width: 0; white-space: nowrap; overflow: hidden; line-height: normal; word-break: normal; }
+.mn-name.seed { font-size: 0.55rem; font-weight: 600; color: var(--accent-2); font-style: normal; }
+.mn-name.tbd  { font-size: 0.55rem; color: var(--muted); font-weight: 600; font-style: normal; }
 .mn-score { font-size: 0.9rem; font-weight: 800; color: var(--fg); min-width: 14px; text-align: right; flex-shrink: 0; }
 .mn-score.winner { color: var(--accent); }
 .mn-score.live   { color: var(--live-color); }
@@ -707,25 +713,27 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';
-const CACHE_TTL = 300;
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
+const CACHE_TTL = 0;
 function parseTwemoji(el) {
   if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
 }
 
+const FLAG_ENG = String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f);
+const FLAG_SCO = String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0073, 0xe0063, 0xe0074, 0xe007f);
 /* ── Group static data ─────────────────────────── */
 const GROUPS_INFO = {
   A: { color: '#00c65e', teams: [['🇲🇽','墨西哥'],['🇿🇦','南非'],['🇰🇷','韓國'],['🇨🇿','捷克']] },
   B: { color: '#ff1744', teams: [['🇨🇦','加拿大'],['🇧🇦','波赫'],['🇨🇭','瑞士'],['🇶🇦','卡達']] },
-  C: { color: '#ff8c00', teams: [['🇧🇷','巴西'],['🇲🇦','摩洛哥'],['🇭🇹','海地'],['🏴󠁧󠁢󠁳󠁣󠁴󠁿','蘇格蘭']] },
+  C: { color: '#ff8c00', teams: [['🇧🇷','巴西'],['🇲🇦','摩洛哥'],['🇭🇹','海地'],[FLAG_SCO,'蘇格蘭']] },
   D: { color: '#1565c0', teams: [['🇺🇸','美國'],['🇵🇾','巴拉圭'],['🇦🇺','澳洲'],['🇹🇷','土耳其']] },
-  E: { color: '#7b1fa2', teams: [['🇩🇪','德國'],['🇨🇮','象牙海岸'],['🇪🇨','厄瓜多'],['🇨🇼','庫拉索']] },
+  E: { color: '#7b1fa2', teams: [['🇩🇪','德國'],['🇨🇮','象牙海岸'],['🇪🇨','厄瓜多'],['🇨🇼','古拉索']] },
   F: { color: '#aeea00', teams: [['🇳🇱','荷蘭'],['🇯🇵','日本'],['🇸🇪','瑞典'],['🇹🇳','突尼西亞']] },
   G: { color: '#ff1493', teams: [['🇪🇸','西班牙'],['🇨🇻','維德角'],['🇸🇦','沙烏地阿拉伯'],['🇺🇾','烏拉圭']] },
   H: { color: '#00e5d4', teams: [['🇧🇪','比利時'],['🇪🇬','埃及'],['🇮🇷','伊朗'],['🇳🇿','紐西蘭']] },
   I: { color: '#9c27b0', teams: [['🇦🇷','阿根廷'],['🇩🇿','阿爾及利亞'],['🇦🇹','奧地利'],['🇯🇴','約旦']] },
   J: { color: '#00897b', teams: [['🇫🇷','法國'],['🇸🇳','塞內加爾'],['🇮🇶','伊拉克'],['🇳🇴','挪威']] },
-  K: { color: '#f4511e', teams: [['🏴󠁧󠁢󠁥󠁮󠁧󠁿','英格蘭'],['🇬🇭','迦納'],['🇵🇦','巴拿馬'],['🇭🇷','克羅埃西亞']] },
+  K: { color: '#f4511e', teams: [[FLAG_ENG,'英格蘭'],['🇬🇭','迦納'],['🇵🇦','巴拿馬'],['🇭🇷','克羅埃西亞']] },
   L: { color: '#00b0ff', teams: [['🇵🇹','葡萄牙'],['🇺🇿','烏茲別克'],['🇨🇴','哥倫比亞'],['🇨🇩','民主剛果']] },
 };
 
@@ -762,19 +770,20 @@ const PHASE_LABELS = {
 /* ── Cache ─────────────────────────────────────── */
 function cacheGet(k) {
   try {
-    const r = sessionStorage.getItem(k);
+    const r = localStorage.getItem(k);
     if (!r) return null;
     const { ts, data } = JSON.parse(r);
     return Date.now() - ts < CACHE_TTL * 1000 ? data : null;
   } catch { return null; }
 }
 function cacheSet(k, d) {
-  try { sessionStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
+  try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
 }
 async function fetchAllMatches() {
+  if (new URLSearchParams(location.search).get('t')) localStorage.removeItem('wc26_all');
   const hit = cacheGet('wc26_all');
   if (hit) return hit;
-  const res  = await fetch(`${GAS_URL}?action=getMatches`);
+  const res  = await fetch(`${GAS_URL}?action=getMatches&_=${Date.now()}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json.status === 'error') throw new Error(json.message);
@@ -784,8 +793,8 @@ async function fetchAllMatches() {
 
 /* ── Phase helpers ─────────────────────────────── */
 function isTBD(t) { return !t.code && !t.name; }
-const TEAM_NAMES = { '波士尼亞': '波赫', '剛果': '民主剛果' };
-function teamName(t) { const n = t.name || t.code || ''; return TEAM_NAMES[n] || n; }
+const TEAM_NAMES_BY_CODE = { BIH: '波赫', CUW: '古拉索', CGO: '民主剛果' };
+function teamName(t) { return TEAM_NAMES_BY_CODE[t.code] || t.name || t.code || ''; }
 
 function isAllTBD(ms)  { return ms.length > 0 && ms.every(m => isTBD(m.team1) && isTBD(m.team2)); }
 function isAllDone(ms) { return ms.length > 0 && ms.every(m => m.status === 'finished'); }
@@ -1310,6 +1319,11 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+window.addEventListener('storage', e => {
+  if (e.key !== 'wc26_refresh_token') return;
+  location.replace(`${location.pathname}?t=${Date.now()}`);
+});
 
 </script>
 <script>

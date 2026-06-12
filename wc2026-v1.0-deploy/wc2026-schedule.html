@@ -309,11 +309,15 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 
 <script>
 // ── 部署時修改這裡 ───────────────────────────
-const GAS_URL      = 'https://script.google.com/macros/s/AKfycbw6CYUYELg_1hfnuozFtiq2HkyvHzz-O2KPUTkRQ7NOrJqW64tXlWgrM4JiRDR8ZRQDiA/exec';   // GAS Web App 部署 URL
-const CACHE_TTL    = 300;  // 快取秒數
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';   // GAS Web App 部署 URL
+const CACHE_TTL    = 0;    // 快取秒數；0 = 每次載入都讀最新資料
 const LIVE_REFRESH = 60;   // live 場次自動刷新秒數
-const TEAM_NAMES   = { '波士尼亞': '波赫', '剛果': '民主剛果' };
-function teamName(n) { return TEAM_NAMES[n] || n; }
+const TEAM_NAMES_BY_CODE = { BIH: '波赫', CUW: '古拉索', CGO: '民主剛果' };
+function teamName(team) {
+  if (!team) return '';
+  if (typeof team === 'string') return team;
+  return TEAM_NAMES_BY_CODE[team.code] || team.name || team.code || '';
+}
 // ────────────────────────────────────────────
 function parseTwemoji(el) {
   if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
@@ -388,6 +392,7 @@ function cacheSet(key, data) {
 // ─── API fetch ────────────────────────────────
 
 async function apiFetch(params) {
+  params._ = Date.now();
   const url = GAS_URL + '?' + new URLSearchParams(params).toString();
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -409,6 +414,7 @@ async function fetchAllMatches(bypassCache) {
 
 async function fetchGroups() {
   const key = 'wc26_groups';
+  if (new URLSearchParams(location.search).get('t')) localStorage.removeItem(key);
   const hit = cacheGet(key);
   if (hit) return hit;
   const data = await apiFetch({ action: 'getGroups' });
@@ -589,8 +595,8 @@ function renderMatchCard(m) {
   if (m.city)  parts.push(m.city);
   const infoLine = parts.join(' · ');
 
-  const n1 = teamName(m.team1.name) || m.team1.code || '待定';
-  const n2 = teamName(m.team2.name) || m.team2.code || '待定';
+  const n1 = teamName(m.team1) || '待定';
+  const n2 = teamName(m.team2) || '待定';
   const nc = n => n.length >= 9 ? 'xs' : n.length >= 7 ? 'sm' : '';
   const nc1 = nc(n1), nc2 = nc(n2);
 
@@ -665,7 +671,7 @@ function renderGroupsGrid(groups) {
               <td>
                 <div class="team-cell">
                   <span class="t-flag">${t.team.flag}</span>
-                  <span class="t-name${((teamName(t.team.name||t.team.code||'')).length>=7?' xs':(teamName(t.team.name||t.team.code||'')).length>=5?' sm':'')}">${teamName(t.team.name) || t.team.code}</span>
+                  <span class="t-name${((teamName(t.team)).length>=7?' xs':(teamName(t.team)).length>=5?' sm':'')}">${teamName(t.team) || t.team.code}</span>
                 </div>
               </td>
               <td>${t.played}</td>
@@ -770,6 +776,11 @@ async function init() {
 // ─── Event listeners ──────────────────────────
 
 document.addEventListener('DOMContentLoaded', init);
+
+window.addEventListener('storage', e => {
+  if (e.key !== 'wc26_refresh_token') return;
+  location.replace(`${location.pathname}?t=${Date.now()}`);
+});
 
 document.getElementById('overlay').addEventListener('click', e => {
   if (!document.getElementById('overlay-panel').contains(e.target)) closeOverlay();
