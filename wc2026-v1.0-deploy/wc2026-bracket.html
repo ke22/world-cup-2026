@@ -729,24 +729,24 @@ const GROUPS_INFO = {
   D: { color: '#1565c0', teams: [['🇺🇸','美國'],['🇵🇾','巴拉圭'],['🇦🇺','澳洲'],['🇹🇷','土耳其']] },
   E: { color: '#7b1fa2', teams: [['🇩🇪','德國'],['🇨🇮','象牙海岸'],['🇪🇨','厄瓜多'],['🇨🇼','古拉索']] },
   F: { color: '#aeea00', teams: [['🇳🇱','荷蘭'],['🇯🇵','日本'],['🇸🇪','瑞典'],['🇹🇳','突尼西亞']] },
-  G: { color: '#ff1493', teams: [['🇪🇸','西班牙'],['🇨🇻','維德角'],['🇸🇦','沙烏地阿拉伯'],['🇺🇾','烏拉圭']] },
-  H: { color: '#00e5d4', teams: [['🇧🇪','比利時'],['🇪🇬','埃及'],['🇮🇷','伊朗'],['🇳🇿','紐西蘭']] },
-  I: { color: '#9c27b0', teams: [['🇦🇷','阿根廷'],['🇩🇿','阿爾及利亞'],['🇦🇹','奧地利'],['🇯🇴','約旦']] },
-  J: { color: '#00897b', teams: [['🇫🇷','法國'],['🇸🇳','塞內加爾'],['🇮🇶','伊拉克'],['🇳🇴','挪威']] },
-  K: { color: '#f4511e', teams: [[FLAG_ENG,'英格蘭'],['🇬🇭','迦納'],['🇵🇦','巴拿馬'],['🇭🇷','克羅埃西亞']] },
-  L: { color: '#00b0ff', teams: [['🇵🇹','葡萄牙'],['🇺🇿','烏茲別克'],['🇨🇴','哥倫比亞'],['🇨🇩','民主剛果']] },
+  G: { color: '#ff1493', teams: [['🇧🇪','比利時'],['🇪🇬','埃及'],['🇮🇷','伊朗'],['🇳🇿','紐西蘭']] },
+  H: { color: '#00e5d4', teams: [['🇪🇸','西班牙'],['🇨🇻','維德角'],['🇸🇦','沙烏地阿拉伯'],['🇺🇾','烏拉圭']] },
+  I: { color: '#9c27b0', teams: [['🇫🇷','法國'],['🇸🇳','塞內加爾'],['🇮🇶','伊拉克'],['🇳🇴','挪威']] },
+  J: { color: '#00897b', teams: [['🇦🇷','阿根廷'],['🇩🇿','阿爾及利亞'],['🇦🇹','奧地利'],['🇯🇴','約旦']] },
+  K: { color: '#f4511e', teams: [['🇵🇹','葡萄牙'],['🇺🇿','烏茲別克'],['🇨🇴','哥倫比亞'],['🇨🇩','民主剛果']] },
+  L: { color: '#00b0ff', teams: [[FLAG_ENG,'英格蘭'],['🇭🇷','克羅埃西亞'],['🇬🇭','迦納'],['🇵🇦','巴拿馬']] },
 };
 
 /* ── R32 seeding (WC 2026 official bracket) ─── */
 const R32_SEEDS = {
-  73: ['1E','3 ABCDF'], 74: ['1I','3 CDFGH'],
-  75: ['2A','2B'],      76: ['1F','2C'],
-  77: ['2K','2L'],      78: ['1H','2J'],
-  79: ['1D','3 BEFIJ'], 80: ['1G','3 AEHIJ'],
-  81: ['1C','2F'],      82: ['2E','2I'],
-  83: ['1A','3 CEFHI'], 84: ['1L','3 EHIJK'],
-  85: ['1J','2H'],      86: ['2D','2G'],
-  87: ['1B','3 EFGIJ'], 88: ['1K','3 DEIJL'],
+  73: ['2A','2B'],      74: ['1E','3 ABCDF'],
+  75: ['1F','2C'],      76: ['1C','2F'],
+  77: ['1I','3 CDFGH'], 78: ['2E','2I'],
+  79: ['1A','3 CEFHI'], 80: ['1L','3 EHIJK'],
+  81: ['1D','3 BEFIJ'], 82: ['1G','3 AEHIJ'],
+  83: ['2K','2L'],      84: ['1H','2J'],
+  85: ['1B','3 EFGIJ'], 86: ['1J','2H'],
+  87: ['1K','3 DEIJL'], 88: ['2D','2G'],
 };
 
 /* Convert raw seed code to readable Chinese label */
@@ -755,7 +755,7 @@ function formatSeed(code) {
   const m1 = code.match(/^([12])([A-L])$/);
   if (m1) return `${m1[2]}組第${m1[1]}`;
   const m3 = code.match(/^3\s*([A-L]+)$/);
-  if (m3) return `3名(${m3[1]})`;
+  if (m3) return '待定';
   return code;
 }
 
@@ -763,8 +763,8 @@ const PHASE_R32='32強', PHASE_R16='16強', PHASE_QF='8強',
       PHASE_SF='4強',   PHASE_3RD='季軍賽', PHASE_F='決賽';
 
 const PHASE_LABELS = {
-  [PHASE_R32]:'32強', [PHASE_R16]:'16強', [PHASE_QF]:'8強（準決賽）',
-  [PHASE_SF]:'4強（半決賽）', [PHASE_3RD]:'季軍賽', [PHASE_F]:'決賽',
+  [PHASE_R32]:'32強', [PHASE_R16]:'16強', [PHASE_QF]:'8強',
+  [PHASE_SF]:'4強', [PHASE_3RD]:'季軍賽', [PHASE_F]:'決賽',
 };
 
 /* ── Cache ─────────────────────────────────────── */
@@ -819,9 +819,8 @@ function buildNode(m) {
   function row(t, score, idx) {
     const tbd  = isTBD(t);
     const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
-    const is3rd = seed && /^3\s*[A-L]+$/.test(seed);
-    const label = seed ? (is3rd ? '待定' : formatSeed(seed)) : (tbd ? '' : teamName(t));
-    const nameCls = seed ? (is3rd ? 'tbd' : 'seed') : (tbd ? 'tbd' : '');
+    const label = seed ? formatSeed(seed) : (tbd ? '' : teamName(t));
+    const nameCls = seed ? 'seed' : (tbd ? 'tbd' : '');
     const flagHtml = tbd ? '' : `<span class="mn-flag">${t.flag}</span>`;
 
     let scoreHtml = '';
@@ -1211,9 +1210,8 @@ function buildMobileMatch(m) {
   function mTeam(t, idx) {
     const tbd  = isTBD(t);
     const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
-    const is3rd = seed && /^3\s*[A-L]+$/.test(seed);
-    const label = seed ? (is3rd ? '待定' : formatSeed(seed)) : (tbd ? '待定' : teamName(t));
-    const nc = seed ? (is3rd ? ' tbd' : ' seed') : (tbd ? ' tbd' : '');
+    const label = seed ? formatSeed(seed) : (tbd ? '待定' : teamName(t));
+    const nc = seed ? ' seed' : (tbd ? ' tbd' : '');
     return `<div class="mobile-team">
       <span class="mobile-flag">${tbd ? '❓' : t.flag}</span>
       <span class="mobile-name${nc}">${label}</span>
