@@ -1316,7 +1316,28 @@ async function init() {
   requestAnimationFrame(fitBracket);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+let _bracketRefreshInFlight = false;
+let _bracketRefreshTimer = null;
+
+async function refreshBracket() {
+  if (_bracketRefreshInFlight) return;
+  _bracketRefreshInFlight = true;
+  try {
+    await init();
+  } finally {
+    _bracketRefreshInFlight = false;
+  }
+}
+
+function startBracketAutoRefresh() {
+  if (_bracketRefreshTimer) clearInterval(_bracketRefreshTimer);
+  _bracketRefreshTimer = setInterval(refreshBracket, 60 * 1000);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await refreshBracket();
+  startBracketAutoRefresh();
+});
 
 window.addEventListener('storage', e => {
   if (e.key !== 'wc26_refresh_token') return;

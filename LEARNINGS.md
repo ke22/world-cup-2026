@@ -152,3 +152,52 @@ CNA 要求使用 `data-src` lazy-load 模式。`embed-loader.js`：
 - 其他 → `upcoming`
 
 live 或 finished 狀態即使 fullTime 尚空也要同步；比分為 null 時保留 Sheet 現有比分欄。`syncScores()` 有更新時也要呼叫 `refreshScoreEditorSheet(false)`，避免前端讀 `matches` 已更新，但編輯分頁看起來沒變。
+
+---
+
+## 16. 32 強對陣改為後端純函式解析（取代 football-data 鏡射）
+
+**問題**：`syncBracket()` 原本鏡射 football-data.org 已解析好的淘汰賽對陣，但該免費 API 在小組賽結束後才寫入晉級隊伍，導致 32 強長期停在 TBD。
+
+**解法**：以本地純函式取代外部依賴，由 `syncBracket()` 負責讀寫 Sheet：
+
+- `rankGroup(teams, matches)` — FIFA 2026 對賽優先排序（對賽積分 → 對賽得失球 → 對賽進球 → 子集合重排 → 整體 gd/gf → team code fallback），**不可**與跨組第三名共用 comparator。
+- `rankThirds(thirds)` — 跨組第三名以 pts → gd → gf 取前 8。
+- `assignThirds(qualifiedGroups)` — 查 `getThirdPlaceAllocation()`（495 組組合表），非 8 組或查無組合回傳 null。
+- `resolveR32(groups, matches)` — 協調者，輸出 `{matchId: {home, away}}`（match_id 73–88）。
+- `resolveClinchedGroupRanks` — 以剩餘最高可得分保守判定，只有名次數學上鎖定才解析。
+
+沿用 `tests/api-auto-update.test.js` 的 `loadFunctions(gasCode, [...])` vm 抽取模式做 TDD，無需測試框架。
+
+---
+
+## 17. GAS：存檔 ≠ 執行；time trigger 跨 re-paste 保留
+
+**踩雷**：把新 `Code.gs` 貼進 Apps Script 編輯器並存檔後，Sheet 完全沒變。
+
+**原因**：存檔只更新程式碼，不會執行任何函式。解析邏輯在 `syncBracket()` 內，要等到有函式被呼叫才會寫入：
+
+```
+[每 10 分 trigger] → syncScores → recalcGroups → syncBracket → 寫入 73–88
+```
+
+**重點**：
+- Trigger 屬於 Apps Script **專案**層級，不在程式碼內——re-paste 程式碼**不會**新增或刪除 trigger，既有 trigger 會直接跑新版程式碼。沒裝過就跑一次 `setupSyncTrigger()`。
+- 要立即看到結果就手動執行 `syncBracket`（或 `syncScores`，但後者會抓 API 比分覆寫手動測試資料）。
+- 手動輸入比分走「套用比分編輯分頁」→ `recalcGroups()`，但**不會**呼叫 `syncBracket`；對戰表要等下一次 10 分 trigger 才填。
+
+---
+
+## 18. `SHEET_ID` 是整條管線的單一開關；多份 Sheet 容易誤判
+
+`Code.gs` 第 2 行的 `SHEET_ID` 同時決定 `syncScores` / `recalcGroups` / `syncBracket` 讀寫哪份試算表，以及 `doGet` Web App API 對外提供哪份資料。`doGet` 即時讀 `SHEET_ID`，換 Sheet 不需重新部署。
+
+**教訓**：除錯「跑了沒變」時，先確認**正在編輯的 Sheet** 與**程式碼指向的 Sheet** 是同一份——專案常有舊/新兩份試算表，貼錯或看錯就會以為功能壞了。本專案的正式 Sheet 是 `1YDuNRBG…`。
+
+---
+
+## 19. R32 seed map 已對照官方；第三名分配表待核對
+
+`getR32SeedMap()`（後端）與 `R32_SEEDS`（前端 `wc2026-bracket.html`）兩份必須等價，已逐場比對 16 場 73–88 完全一致；並已對照 Wikipedia「2026 FIFA World Cup knockout stage」官方對陣表全部 16 場吻合（小組第 1/2 與第三名 pool 皆正確）。
+
+**待辦**：`getThirdPlaceAllocation()` 的 495 組「最佳第三名 → slot」分配表為機器產生（自 Wikipedia 解析），組合 pool 已驗證，但**逐組合的 slot 指派尚未對照 FIFA 官方規程 Annex**。只在 8 隊晉級第三名全部確定後才影響顯示，賽前應完成核對。

@@ -1,6 +1,6 @@
 # WC2026 互動圖表 — CNA 交接文件
 
-> 最後更新：2026-06-12
+> 最後更新：2026-06-22
 
 ## 元件清單
 
@@ -96,6 +96,26 @@
 ### 清除所有測試比分
 
 在 Google Apps Script 編輯器中執行 `clearAllScores()`，會將所有場次重置為 `upcoming`、比分清空。
+
+---
+
+## 淘汰賽 32 強自動解析（後端）
+
+32 強（match_id 73–88）的晉級隊伍由**後端純函式**依小組積分自動解析，**不再**依賴 football-data.org 的淘汰賽對陣。流程：
+
+```
+[每 10 分 trigger] → syncScores → recalcGroups → syncBracket → 寫入 matches 73–88
+[bracket 頁面]     → 每 60 秒自動重抓並重繪
+```
+
+**運作要點**：
+
+1. 對陣結構寫死在 `Code.gs` 的 `getR32SeedMap()`（與前端 `wc2026-bracket.html` 的 `R32_SEEDS` 等價，已對照官方 16 場），最佳第三名分配在 `getThirdPlaceAllocation()`。
+2. **漸進式填入**：只有小組名次在數學上已鎖定才寫入該側，未確定的一側留空；最佳第三名要等 8 隊全部確定才解析。小組賽中對戰表大多仍是 TBD 屬**正常**。
+3. **手動鎖定**：`matches` 工作表第 R 欄（`manual`）勾選的列整列跳過，不被自動覆寫。
+4. 改完 `Code.gs` 後：貼進 Apps Script → 存檔 → **手動執行 `syncBracket` 才會立即生效**（存檔不等於執行）；否則等下一次 10 分 trigger。
+
+> ⚠️ **待辦**：`getThirdPlaceAllocation()` 的 495 組分配表為機器產生，組合 pool 已驗證，但逐組合 slot 指派尚未對照 FIFA 官方規程，賽前需核對（詳見 `LEARNINGS.md` #19）。
 
 ---
 

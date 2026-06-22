@@ -592,73 +592,476 @@ function syncScores() {
 }
 
 // ── syncBracket ───────────────────────────────
-// Fills in team names for knockout matches (TBD rows) using football-data.org.
-// Runs automatically at the end of syncScores().
+// Fills in the Round-of-32 team slots (match_id 73–88) by resolving them
+// from the local group standings + the official seed/allocation tables —
+// no longer dependent on football-data.org for knockout teams. Runs
+// automatically at the end of syncScores().
 
 function syncBracket() {
-  const apiKey = PropertiesService.getScriptProperties().getProperty('FD_API_KEY');
-  if (!apiKey) { Logger.log('syncBracket: no API key'); return 0; }
+  const ss     = SpreadsheetApp.openById(SHEET_ID);
+  const mSheet = ss.getSheetByName('matches');
+  const rows   = mSheet.getDataRange().getValues();
 
-  const resp = UrlFetchApp.fetch(
-    'https://api.football-data.org/v4/competitions/WC/matches',
-    { headers: { 'X-Auth-Token': apiKey }, muteHttpExceptions: true }
-  );
-  if (resp.getResponseCode() !== 200) {
-    Logger.log('syncBracket API error ' + resp.getResponseCode()); return 0;
-  }
-
-  const apiMatches = JSON.parse(resp.getContentText()).matches;
-
-  // Build lookup: UTC+8 "YYYY-MM-DD_HH:MM" → API match
-  const byDateTime = {};
-  apiMatches.forEach(m => {
-    const d  = new Date(new Date(m.utcDate).getTime() + 8 * 3600000);
-    const dt = d.toISOString().slice(0, 10) + '_' +
-               String(d.getUTCHours()).padStart(2, '0') + ':' +
-               String(d.getUTCMinutes()).padStart(2, '0');
-    byDateTime[dt] = m;
+  // Standings + team metadata (name/flag by code) from the groups sheet.
+  const gRows = ss.getSheetByName('groups').getDataRange().getValues();
+  gRows.shift();
+  const standings  = [];
+  const metaByCode = {};
+  gRows.forEach(r => {
+    const code = String(r[1] || '');
+    if (!code) return;
+    standings.push({
+      group: String(r[0]), code: code,
+      played: Number(r[4]) || 0, pts: Number(r[11]) || 0,
+      gd: Number(r[10]) || 0, gf: Number(r[8]) || 0
+    });
+    metaByCode[code] = { name: String(r[2] || ''), flag: String(r[3] || '') };
   });
 
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
-  const rows  = sheet.getDataRange().getValues();
-
-  // Build TLA → Chinese team data from known group-stage rows
-  const teamByTla = {};
-  rows.slice(1).forEach(row => {
-    const c1 = String(row[6]||''), n1 = String(row[7]||''), f1 = String(row[8]||'');
-    const c2 = String(row[9]||''), n2 = String(row[10]||''), f2 = String(row[11]||'');
-    if (c1 && n1) teamByTla[fdCode(c1)] = { code: c1, name: n1, flag: f1 };
-    if (c2 && n2) teamByTla[fdCode(c2)] = { code: c2, name: n2, flag: f2 };
-  });
+  const groupMatches = buildGroupMatchResults_(rows.slice(1));
+  const r32 = resolveR32(standings, groupMatches);
 
   let updated = 0;
   rows.slice(1).forEach((row, i) => {
-    if (!row[0])          return; // empty row
-    if (row[6])           return; // already has home team — skip
-    if (row[17] === true) return; // manual lock
+    const id = Number(row[0]);
+    if (!id || !r32[id]) return; // not a resolvable R32 row (73–88)
+    const resolved = r32[id];
+    const next = planR32RowUpdate_(row, resolved, metaByCode);
+    if (!next) return; // manual lock
+    if (resolved.home && !metaByCode[resolved.home])
+      Logger.log(`syncBracket: #${id} missing metadata for ${resolved.home}`);
+    if (resolved.away && !metaByCode[resolved.away])
+      Logger.log(`syncBracket: #${id} missing metadata for ${resolved.away}`);
 
-    const date = formatDate(row[1]);
-    const time = formatTime(row[2]);
-    if (!date || !time) return;
-
-    const apiMatch = byDateTime[`${date}_${time}`];
-    if (!apiMatch) return;
-
-    const t1 = teamByTla[apiMatch.homeTeam.tla];
-    const t2 = teamByTla[apiMatch.awayTeam.tla];
-    if (!t1 || !t2) return; // unrecognised TLA (e.g. TBD in API too)
-
-    sheet.getRange(i + 2, 7, 1, 6).setValues([[
-      t1.code, t1.name, t1.flag,
-      t2.code, t2.name, t2.flag
-    ]]);
+    const current = row.slice(6, 12).map(v => String(v || ''));
+    if (current.every((v, idx) => v === String(next[idx] || ''))) return;
+    mSheet.getRange(i + 2, 7, 1, 6).setValues([next]);
     updated++;
-    Logger.log(`syncBracket: #${row[0]} → ${t1.name} vs ${t2.name}`);
+    Logger.log(`syncBracket: #${id} → ${next[1] || 'TBD'} vs ${next[4] || 'TBD'}`);
   });
 
   if (updated > 0) touchDataVersion();
   Logger.log(`syncBracket: ${updated} matches updated`);
   return updated;
+}
+
+// Return the six team cells for an automatically managed R32 row.
+// A locked row returns null. Missing/unresolved sides intentionally become
+// blank triples so stale automatic values cannot survive a later recalculation.
+function planR32RowUpdate_(row, resolved, metaByCode) {
+  if (row[17] === true) return null;
+  function side(code) {
+    const meta = code && metaByCode[code];
+    return meta ? [code, meta.name, meta.flag] : ['', '', ''];
+  }
+  return side(resolved.home).concat(side(resolved.away));
+}
+
+// Convert matches Sheet rows into the pure match shape used by FIFA
+// head-to-head ranking. Scores remain null until both cells are populated.
+function buildGroupMatchResults_(rows) {
+  return rows.filter(row => String(row[3] || '') === '小組賽' && row[6] && row[9]).map(row => ({
+    group: String(row[4] || ''),
+    team1: String(row[6]),
+    team2: String(row[9]),
+    score1: row[12] === '' || row[12] === null || row[12] === undefined ? null : Number(row[12]),
+    score2: row[13] === '' || row[13] === null || row[13] === undefined ? null : Number(row[13]),
+    status: String(row[14] || 'upcoming')
+  }));
+}
+
+// ── Knockout bracket resolution (pure functions) ──────────────────
+// Resolve Round-of-32 teams from group standings + the official seed
+// map, replacing the football-data.org dependency for the bracket.
+// See change: knockout-bracket-resolution.
+
+// Compare two standing entries for ranking: points → goal difference →
+// goals for (all descending), then a deterministic fallback by group
+// letter, then team code, so ranking output is always stable.
+function compareStanding_(a, b) {
+  if (b.pts !== a.pts) return b.pts - a.pts;
+  if (b.gd !== a.gd) return b.gd - a.gd;
+  if (b.gf !== a.gf) return b.gf - a.gf;
+  if (a.group !== b.group) return a.group < b.group ? -1 : 1;
+  if (a.code !== b.code) return a.code < b.code ? -1 : 1;
+  return 0;
+}
+
+// Overall criteria used only after the head-to-head criteria cannot split
+// a tied subset: goal difference, goals scored, conduct, FIFA ranking.
+function compareOverallGroup_(a, b) {
+  if (b.gd !== a.gd) return b.gd - a.gd;
+  if (b.gf !== a.gf) return b.gf - a.gf;
+  const aConduct = Number(a.conduct), bConduct = Number(b.conduct);
+  if (!isNaN(aConduct) && !isNaN(bConduct) && bConduct !== aConduct)
+    return bConduct - aConduct;
+  const aRank = Number(a.fifaRank), bRank = Number(b.fifaRank);
+  if (!isNaN(aRank) && !isNaN(bRank) && aRank !== bRank) return aRank - bRank;
+  if (a.code !== b.code) return a.code < b.code ? -1 : 1;
+  return 0;
+}
+
+// Head-to-head mini-table for only the supplied tied teams.
+function getHeadToHeadStats_(teams, matches) {
+  const codes = {};
+  const stats = {};
+  teams.forEach(t => {
+    codes[t.code] = true;
+    stats[t.code] = { pts: 0, gd: 0, gf: 0, ga: 0 };
+  });
+  (matches || []).forEach(m => {
+    if (m.status !== 'finished' || !codes[m.team1] || !codes[m.team2]) return;
+    if (m.score1 === null || m.score1 === undefined || m.score2 === null || m.score2 === undefined) return;
+    const home = stats[m.team1], away = stats[m.team2];
+    const s1 = Number(m.score1), s2 = Number(m.score2);
+    home.gf += s1; home.ga += s2; home.gd = home.gf - home.ga;
+    away.gf += s2; away.ga += s1; away.gd = away.gf - away.ga;
+    if (s1 > s2) home.pts += 3;
+    else if (s2 > s1) away.pts += 3;
+    else { home.pts++; away.pts++; }
+  });
+  return stats;
+}
+
+// Apply FIFA's head-to-head criteria and reapply them when only part of a
+// tied set separates. If the current mini-table cannot split the set, fall
+// through to the overall criteria.
+function rankTiedGroup_(teams, matches) {
+  if (teams.length <= 1) return teams.slice();
+  const stats = getHeadToHeadStats_(teams, matches);
+  const sorted = teams.slice().sort((a, b) => {
+    const sa = stats[a.code], sb = stats[b.code];
+    if (sb.pts !== sa.pts) return sb.pts - sa.pts;
+    if (sb.gd !== sa.gd) return sb.gd - sa.gd;
+    if (sb.gf !== sa.gf) return sb.gf - sa.gf;
+    return 0;
+  });
+  const buckets = [];
+  sorted.forEach(team => {
+    const s = stats[team.code];
+    const key = `${s.pts}|${s.gd}|${s.gf}`;
+    const last = buckets[buckets.length - 1];
+    if (!last || last.key !== key) buckets.push({ key: key, teams: [team] });
+    else last.teams.push(team);
+  });
+  if (buckets.length === 1) return teams.slice().sort(compareOverallGroup_);
+  const result = teams.slice(0, 0);
+  buckets.forEach(bucket => {
+    const ranked = bucket.teams.length > 1 ? rankTiedGroup_(bucket.teams, matches) : bucket.teams;
+    ranked.forEach(team => result.push(team));
+  });
+  return result;
+}
+
+// Rank a group's teams using FIFA 2026: total points, then the head-to-head
+// mini-table, then overall criteria. Does not mutate the input array.
+function rankGroup(teams, matches) {
+  const byPoints = {};
+  teams.forEach(t => { (byPoints[t.pts] || (byPoints[t.pts] = [])).push(t); });
+  const result = teams.slice(0, 0);
+  Object.keys(byPoints).map(Number).sort((a, b) => b - a).forEach(pts => {
+    rankTiedGroup_(byPoints[pts], matches || []).forEach(team => result.push(team));
+  });
+  return result;
+}
+
+// Rank the twelve third-placed teams. The first eight in the returned
+// array are the qualifying thirds; the rest are eliminated.
+function rankThirds(thirds) {
+  return thirds.slice().sort(compareStanding_);
+}
+
+// Conservatively resolve exact positions that can no longer change.
+// A team is fixed at rank N only when exactly N rivals are guaranteed to
+// finish above it and no additional rival can still reach its current points.
+// Completed groups use the final tiebreak ordering directly.
+function hasFinishedHeadToHeadWin_(teamCode, rivalCode, matches) {
+  return (matches || []).some(m => {
+    if (m.status !== 'finished') return false;
+    if (m.team1 === teamCode && m.team2 === rivalCode) return Number(m.score1) > Number(m.score2);
+    if (m.team2 === teamCode && m.team1 === rivalCode) return Number(m.score2) > Number(m.score1);
+    return false;
+  });
+}
+
+function resolveClinchedGroupRanks(teams, matches) {
+  const unresolved = { winner: null, runnerUp: null, third: null };
+  if (!Array.isArray(teams) || teams.length !== 4) return unresolved;
+
+  const normalized = teams.map(t => ({
+    group: t.group,
+    code: t.code,
+    pts: Number(t.pts) || 0,
+    gd: Number(t.gd) || 0,
+    gf: Number(t.gf) || 0,
+    played: t.played === undefined ? 3 : Math.max(0, Math.min(3, Number(t.played) || 0))
+  }));
+
+  if (normalized.every(t => t.played === 3)) {
+    const ranked = rankGroup(normalized, matches || []);
+    return { winner: ranked[0].code, runnerUp: ranked[1].code, third: ranked[2].code };
+  }
+
+  const keys = ['winner', 'runnerUp', 'third'];
+  normalized.forEach(team => {
+    const maxPoints = team.pts + (3 - team.played) * 3;
+    const rivals = normalized.filter(other => other.code !== team.code);
+    const guaranteedAbove = rivals.filter(other => other.pts > maxPoints).length;
+    const canFinishAbove = rivals.filter(other => {
+      const otherMax = other.pts + (3 - other.played) * 3;
+      if (otherMax > team.pts) return true;
+      if (otherMax < team.pts) return false;
+      return !hasFinishedHeadToHeadWin_(team.code, other.code, matches || []);
+    }).length;
+    if (guaranteedAbove === canFinishAbove && guaranteedAbove < keys.length) {
+      unresolved[keys[guaranteedAbove]] = team.code;
+    }
+  });
+  return unresolved;
+}
+
+// Official WC2026 Round-of-32 seed map (match_id 73–88 → two seed
+// codes). Single source of truth, kept equivalent to R32_SEEDS in
+// wc2026-bracket.html. A `3 XXXXX` code is a best-third-place slot.
+function getR32SeedMap() {
+  return {
+    73: ['2A', '2B'],      74: ['1E', '3 ABCDF'],
+    75: ['1F', '2C'],      76: ['1C', '2F'],
+    77: ['1I', '3 CDFGH'], 78: ['2E', '2I'],
+    79: ['1A', '3 CEFHI'], 80: ['1L', '3 EHIJK'],
+    81: ['1D', '3 BEFIJ'], 82: ['1G', '3 AEHIJ'],
+    83: ['2K', '2L'],      84: ['1H', '2J'],
+    85: ['1B', '3 EFGIJ'], 86: ['1J', '2H'],
+    87: ['1K', '3 DEIJL'], 88: ['2D', '2G']
+  };
+}
+
+// Official WC2026 best-third-place allocation table (FIFA regulations
+// Annex C) — all C(12,8) = 495 combinations. Parsed and verified from
+// Wikipedia Template:2026_FIFA_World_Cup_third-place_table: every row's
+// assignment was cross-checked against getR32SeedMap allowed-sets and the
+// combination cells, with zero mismatches. NEEDS-VERIFICATION against the
+// official FIFA regulations PDF before the tournament.
+// Key: 8 qualifying group letters (sorted, joined). Value: the third-place
+// group assigned to each winner slot, in order [1A,1B,1D,1E,1G,1I,1K,1L].
+function getThirdPlaceAllocation() {
+  return {
+    'ABCDEFGH':'HGBCAFDE', 'ABCDEFGI':'CGBDAFEI', 'ABCDEFGJ':'CGBDAFEJ', 'ABCDEFGK':'CGBDAFEK',
+    'ABCDEFGL':'CGBDAFLE', 'ABCDEFHI':'HEBCAFDI', 'ABCDEFHJ':'HJBCAFDE', 'ABCDEFHK':'HEBCAFDK',
+    'ABCDEFHL':'HFBCADLE', 'ABCDEFIJ':'CJBDAFEI', 'ABCDEFIK':'CEBDAFIK', 'ABCDEFIL':'CEBDAFLI',
+    'ABCDEFJK':'CJBDAFEK', 'ABCDEFJL':'CJBDAFLE', 'ABCDEFKL':'CEBDAFLK', 'ABCDEGHI':'HGBCADEI',
+    'ABCDEGHJ':'HGBCADEJ', 'ABCDEGHK':'HGBCADEK', 'ABCDEGHL':'HGBCADLE', 'ABCDEGIJ':'EGBCADIJ',
+    'ABCDEGIK':'EGBCADIK', 'ABCDEGIL':'EGBCADLI', 'ABCDEGJK':'EGBCADJK', 'ABCDEGJL':'EGBCADLJ',
+    'ABCDEGKL':'EGBCADLK', 'ABCDEHIJ':'HJBCADEI', 'ABCDEHIK':'HEBCADIK', 'ABCDEHIL':'HEBCADLI',
+    'ABCDEHJK':'HJBCADEK', 'ABCDEHJL':'HJBCADLE', 'ABCDEHKL':'HEBCADLK', 'ABCDEIJK':'EJBCADIK',
+    'ABCDEIJL':'EJBCADLI', 'ABCDEIKL':'EIBCADLK', 'ABCDEJKL':'EJBCADLK', 'ABCDFGHI':'HGBCAFDI',
+    'ABCDFGHJ':'HGBCAFDJ', 'ABCDFGHK':'HGBCAFDK', 'ABCDFGHL':'CGBDAFLH', 'ABCDFGIJ':'CGBDAFIJ',
+    'ABCDFGIK':'CGBDAFIK', 'ABCDFGIL':'CGBDAFLI', 'ABCDFGJK':'CGBDAFJK', 'ABCDFGJL':'CGBDAFLJ',
+    'ABCDFGKL':'CGBDAFLK', 'ABCDFHIJ':'HJBCAFDI', 'ABCDFHIK':'HFBCADIK', 'ABCDFHIL':'HFBCADLI',
+    'ABCDFHJK':'HJBCAFDK', 'ABCDFHJL':'CJBDAFLH', 'ABCDFHKL':'HFBCADLK', 'ABCDFIJK':'CJBDAFIK',
+    'ABCDFIJL':'CJBDAFLI', 'ABCDFIKL':'CIBDAFLK', 'ABCDFJKL':'CJBDAFLK', 'ABCDGHIJ':'HGBCADIJ',
+    'ABCDGHIK':'HGBCADIK', 'ABCDGHIL':'HGBCADLI', 'ABCDGHJK':'HGBCADJK', 'ABCDGHJL':'HGBCADLJ',
+    'ABCDGHKL':'HGBCADLK', 'ABCDGIJK':'CJBDAGIK', 'ABCDGIJL':'CJBDAGLI', 'ABCDGIKL':'IGBCADLK',
+    'ABCDGJKL':'CJBDAGLK', 'ABCDHIJK':'HJBCADIK', 'ABCDHIJL':'HJBCADLI', 'ABCDHIKL':'HIBCADLK',
+    'ABCDHJKL':'HJBCADLK', 'ABCDIJKL':'IJBCADLK', 'ABCEFGHI':'HGBCAFEI', 'ABCEFGHJ':'HGBCAFEJ',
+    'ABCEFGHK':'HGBCAFEK', 'ABCEFGHL':'HGBCAFLE', 'ABCEFGIJ':'EGBCAFIJ', 'ABCEFGIK':'EGBCAFIK',
+    'ABCEFGIL':'EGBCAFLI', 'ABCEFGJK':'EGBCAFJK', 'ABCEFGJL':'EGBCAFLJ', 'ABCEFGKL':'EGBCAFLK',
+    'ABCEFHIJ':'HJBCAFEI', 'ABCEFHIK':'HEBCAFIK', 'ABCEFHIL':'HEBCAFLI', 'ABCEFHJK':'HJBCAFEK',
+    'ABCEFHJL':'HJBCAFLE', 'ABCEFHKL':'HEBCAFLK', 'ABCEFIJK':'EJBCAFIK', 'ABCEFIJL':'EJBCAFLI',
+    'ABCEFIKL':'EIBCAFLK', 'ABCEFJKL':'EJBCAFLK', 'ABCEGHIJ':'HJBCAGEI', 'ABCEGHIK':'EGBCAHIK',
+    'ABCEGHIL':'EGBCAHLI', 'ABCEGHJK':'HJBCAGEK', 'ABCEGHJL':'HJBCAGLE', 'ABCEGHKL':'EGBCAHLK',
+    'ABCEGIJK':'EJBCAGIK', 'ABCEGIJL':'EJBCAGLI', 'ABCEGIKL':'EGBAICLK', 'ABCEGJKL':'EJBCAGLK',
+    'ABCEHIJK':'EJBCAHIK', 'ABCEHIJL':'EJBCAHLI', 'ABCEHIKL':'EIBCAHLK', 'ABCEHJKL':'EJBCAHLK',
+    'ABCEIJKL':'EJBAICLK', 'ABCFGHIJ':'HGBCAFIJ', 'ABCFGHIK':'HGBCAFIK', 'ABCFGHIL':'HGBCAFLI',
+    'ABCFGHJK':'HGBCAFJK', 'ABCFGHJL':'HGBCAFLJ', 'ABCFGHKL':'HGBCAFLK', 'ABCFGIJK':'CJBFAGIK',
+    'ABCFGIJL':'CJBFAGLI', 'ABCFGIKL':'IGBCAFLK', 'ABCFGJKL':'CJBFAGLK', 'ABCFHIJK':'HJBCAFIK',
+    'ABCFHIJL':'HJBCAFLI', 'ABCFHIKL':'HIBCAFLK', 'ABCFHJKL':'HJBCAFLK', 'ABCFIJKL':'IJBCAFLK',
+    'ABCGHIJK':'HJBCAGIK', 'ABCGHIJL':'HJBCAGLI', 'ABCGHIKL':'IGBCAHLK', 'ABCGHJKL':'HJBCAGLK',
+    'ABCGIJKL':'IJBCAGLK', 'ABCHIJKL':'IJBCAHLK', 'ABDEFGHI':'HGBDAFEI', 'ABDEFGHJ':'HGBDAFEJ',
+    'ABDEFGHK':'HGBDAFEK', 'ABDEFGHL':'HGBDAFLE', 'ABDEFGIJ':'EGBDAFIJ', 'ABDEFGIK':'EGBDAFIK',
+    'ABDEFGIL':'EGBDAFLI', 'ABDEFGJK':'EGBDAFJK', 'ABDEFGJL':'EGBDAFLJ', 'ABDEFGKL':'EGBDAFLK',
+    'ABDEFHIJ':'HJBDAFEI', 'ABDEFHIK':'HEBDAFIK', 'ABDEFHIL':'HEBDAFLI', 'ABDEFHJK':'HJBDAFEK',
+    'ABDEFHJL':'HJBDAFLE', 'ABDEFHKL':'HEBDAFLK', 'ABDEFIJK':'EJBDAFIK', 'ABDEFIJL':'EJBDAFLI',
+    'ABDEFIKL':'EIBDAFLK', 'ABDEFJKL':'EJBDAFLK', 'ABDEGHIJ':'HJBDAGEI', 'ABDEGHIK':'EGBDAHIK',
+    'ABDEGHIL':'EGBDAHLI', 'ABDEGHJK':'HJBDAGEK', 'ABDEGHJL':'HJBDAGLE', 'ABDEGHKL':'EGBDAHLK',
+    'ABDEGIJK':'EJBDAGIK', 'ABDEGIJL':'EJBDAGLI', 'ABDEGIKL':'EGBAIDLK', 'ABDEGJKL':'EJBDAGLK',
+    'ABDEHIJK':'EJBDAHIK', 'ABDEHIJL':'EJBDAHLI', 'ABDEHIKL':'EIBDAHLK', 'ABDEHJKL':'EJBDAHLK',
+    'ABDEIJKL':'EJBAIDLK', 'ABDFGHIJ':'HGBDAFIJ', 'ABDFGHIK':'HGBDAFIK', 'ABDFGHIL':'HGBDAFLI',
+    'ABDFGHJK':'HGBDAFJK', 'ABDFGHJL':'HGBDAFLJ', 'ABDFGHKL':'HGBDAFLK', 'ABDFGIJK':'FJBDAGIK',
+    'ABDFGIJL':'FJBDAGLI', 'ABDFGIKL':'IGBDAFLK', 'ABDFGJKL':'FJBDAGLK', 'ABDFHIJK':'HJBDAFIK',
+    'ABDFHIJL':'HJBDAFLI', 'ABDFHIKL':'HIBDAFLK', 'ABDFHJKL':'HJBDAFLK', 'ABDFIJKL':'IJBDAFLK',
+    'ABDGHIJK':'HJBDAGIK', 'ABDGHIJL':'HJBDAGLI', 'ABDGHIKL':'IGBDAHLK', 'ABDGHJKL':'HJBDAGLK',
+    'ABDGIJKL':'IJBDAGLK', 'ABDHIJKL':'IJBDAHLK', 'ABEFGHIJ':'HJBFAGEI', 'ABEFGHIK':'EGBFAHIK',
+    'ABEFGHIL':'EGBFAHLI', 'ABEFGHJK':'HJBFAGEK', 'ABEFGHJL':'HJBFAGLE', 'ABEFGHKL':'EGBFAHLK',
+    'ABEFGIJK':'EJBFAGIK', 'ABEFGIJL':'EJBFAGLI', 'ABEFGIKL':'EGBAIFLK', 'ABEFGJKL':'EJBFAGLK',
+    'ABEFHIJK':'EJBFAHIK', 'ABEFHIJL':'EJBFAHLI', 'ABEFHIKL':'EIBFAHLK', 'ABEFHJKL':'EJBFAHLK',
+    'ABEFIJKL':'EJBAIFLK', 'ABEGHIJK':'EJBAHGIK', 'ABEGHIJL':'EJBAHGLI', 'ABEGHIKL':'EGBAIHLK',
+    'ABEGHJKL':'EJBAHGLK', 'ABEGIJKL':'EJBAIGLK', 'ABEHIJKL':'EJBAIHLK', 'ABFGHIJK':'HJBFAGIK',
+    'ABFGHIJL':'HJBFAGLI', 'ABFGHIKL':'HGBAIFLK', 'ABFGHJKL':'HJBFAGLK', 'ABFGIJKL':'IJBFAGLK',
+    'ABFHIJKL':'HJBAIFLK', 'ABGHIJKL':'HJBAIGLK', 'ACDEFGHI':'HGECAFDI', 'ACDEFGHJ':'HGJCAFDE',
+    'ACDEFGHK':'HGECAFDK', 'ACDEFGHL':'HGFCADLE', 'ACDEFGIJ':'CGJDAFEI', 'ACDEFGIK':'CGEDAFIK',
+    'ACDEFGIL':'CGEDAFLI', 'ACDEFGJK':'CGJDAFEK', 'ACDEFGJL':'CGJDAFLE', 'ACDEFGKL':'CGEDAFLK',
+    'ACDEFHIJ':'HJECAFDI', 'ACDEFHIK':'HEFCADIK', 'ACDEFHIL':'HEFCADLI', 'ACDEFHJK':'HJECAFDK',
+    'ACDEFHJL':'HJFCADLE', 'ACDEFHKL':'HEFCADLK', 'ACDEFIJK':'CJEDAFIK', 'ACDEFIJL':'CJEDAFLI',
+    'ACDEFIKL':'CEIDAFLK', 'ACDEFJKL':'CJEDAFLK', 'ACDEGHIJ':'HGJCADEI', 'ACDEGHIK':'HGECADIK',
+    'ACDEGHIL':'HGECADLI', 'ACDEGHJK':'HGJCADEK', 'ACDEGHJL':'HGJCADLE', 'ACDEGHKL':'HGECADLK',
+    'ACDEGIJK':'EGJCADIK', 'ACDEGIJL':'EGJCADLI', 'ACDEGIKL':'EGICADLK', 'ACDEGJKL':'EGJCADLK',
+    'ACDEHIJK':'HJECADIK', 'ACDEHIJL':'HJECADLI', 'ACDEHIKL':'HEICADLK', 'ACDEHJKL':'HJECADLK',
+    'ACDEIJKL':'EJICADLK', 'ACDFGHIJ':'HGJCAFDI', 'ACDFGHIK':'HGFCADIK', 'ACDFGHIL':'HGFCADLI',
+    'ACDFGHJK':'HGJCAFDK', 'ACDFGHJL':'CGJDAFLH', 'ACDFGHKL':'HGFCADLK', 'ACDFGIJK':'CGJDAFIK',
+    'ACDFGIJL':'CGJDAFLI', 'ACDFGIKL':'CGIDAFLK', 'ACDFGJKL':'CGJDAFLK', 'ACDFHIJK':'HJFCADIK',
+    'ACDFHIJL':'HJFCADLI', 'ACDFHIKL':'HFICADLK', 'ACDFHJKL':'HJFCADLK', 'ACDFIJKL':'CJIDAFLK',
+    'ACDGHIJK':'HGJCADIK', 'ACDGHIJL':'HGJCADLI', 'ACDGHIKL':'HGICADLK', 'ACDGHJKL':'HGJCADLK',
+    'ACDGIJKL':'IGJCADLK', 'ACDHIJKL':'HJICADLK', 'ACEFGHIJ':'HGJCAFEI', 'ACEFGHIK':'HGECAFIK',
+    'ACEFGHIL':'HGECAFLI', 'ACEFGHJK':'HGJCAFEK', 'ACEFGHJL':'HGJCAFLE', 'ACEFGHKL':'HGECAFLK',
+    'ACEFGIJK':'EGJCAFIK', 'ACEFGIJL':'EGJCAFLI', 'ACEFGIKL':'EGICAFLK', 'ACEFGJKL':'EGJCAFLK',
+    'ACEFHIJK':'HJECAFIK', 'ACEFHIJL':'HJECAFLI', 'ACEFHIKL':'HEICAFLK', 'ACEFHJKL':'HJECAFLK',
+    'ACEFIJKL':'EJICAFLK', 'ACEGHIJK':'EGJCAHIK', 'ACEGHIJL':'EGJCAHLI', 'ACEGHIKL':'EGICAHLK',
+    'ACEGHJKL':'EGJCAHLK', 'ACEGIJKL':'EJICAGLK', 'ACEHIJKL':'EJICAHLK', 'ACFGHIJK':'HGJCAFIK',
+    'ACFGHIJL':'HGJCAFLI', 'ACFGHIKL':'HGICAFLK', 'ACFGHJKL':'HGJCAFLK', 'ACFGIJKL':'IGJCAFLK',
+    'ACFHIJKL':'HJICAFLK', 'ACGHIJKL':'HJICAGLK', 'ADEFGHIJ':'HGJDAFEI', 'ADEFGHIK':'HGEDAFIK',
+    'ADEFGHIL':'HGEDAFLI', 'ADEFGHJK':'HGJDAFEK', 'ADEFGHJL':'HGJDAFLE', 'ADEFGHKL':'HGEDAFLK',
+    'ADEFGIJK':'EGJDAFIK', 'ADEFGIJL':'EGJDAFLI', 'ADEFGIKL':'EGIDAFLK', 'ADEFGJKL':'EGJDAFLK',
+    'ADEFHIJK':'HJEDAFIK', 'ADEFHIJL':'HJEDAFLI', 'ADEFHIKL':'HEIDAFLK', 'ADEFHJKL':'HJEDAFLK',
+    'ADEFIJKL':'EJIDAFLK', 'ADEGHIJK':'EGJDAHIK', 'ADEGHIJL':'EGJDAHLI', 'ADEGHIKL':'EGIDAHLK',
+    'ADEGHJKL':'EGJDAHLK', 'ADEGIJKL':'EJIDAGLK', 'ADEHIJKL':'EJIDAHLK', 'ADFGHIJK':'HGJDAFIK',
+    'ADFGHIJL':'HGJDAFLI', 'ADFGHIKL':'HGIDAFLK', 'ADFGHJKL':'HGJDAFLK', 'ADFGIJKL':'IGJDAFLK',
+    'ADFHIJKL':'HJIDAFLK', 'ADGHIJKL':'HJIDAGLK', 'AEFGHIJK':'EGJFAHIK', 'AEFGHIJL':'EGJFAHLI',
+    'AEFGHIKL':'EGIFAHLK', 'AEFGHJKL':'EGJFAHLK', 'AEFGIJKL':'EJIFAGLK', 'AEFHIJKL':'EJIFAHLK',
+    'AEGHIJKL':'EJIAHGLK', 'AFGHIJKL':'HJIFAGLK', 'BCDEFGHI':'CGBDHFEI', 'BCDEFGHJ':'HGBCJFDE',
+    'BCDEFGHK':'CGBDHFEK', 'BCDEFGHL':'CGBDHFLE', 'BCDEFGIJ':'CGBDJFEI', 'BCDEFGIK':'CGBDEFIK',
+    'BCDEFGIL':'CGBDEFLI', 'BCDEFGJK':'CGBDJFEK', 'BCDEFGJL':'CGBDJFLE', 'BCDEFGKL':'CGBDEFLK',
+    'BCDEFHIJ':'CJBDHFEI', 'BCDEFHIK':'CEBDHFIK', 'BCDEFHIL':'CEBDHFLI', 'BCDEFHJK':'CJBDHFEK',
+    'BCDEFHJL':'CJBDHFLE', 'BCDEFHKL':'CEBDHFLK', 'BCDEFIJK':'CJBDEFIK', 'BCDEFIJL':'CJBDEFLI',
+    'BCDEFIKL':'CEBDIFLK', 'BCDEFJKL':'CJBDEFLK', 'BCDEGHIJ':'HGBCJDEI', 'BCDEGHIK':'EGBCHDIK',
+    'BCDEGHIL':'EGBCHDLI', 'BCDEGHJK':'HGBCJDEK', 'BCDEGHJL':'HGBCJDLE', 'BCDEGHKL':'EGBCHDLK',
+    'BCDEGIJK':'EGBCJDIK', 'BCDEGIJL':'EGBCJDLI', 'BCDEGIKL':'EGBCIDLK', 'BCDEGJKL':'EGBCJDLK',
+    'BCDEHIJK':'EJBCHDIK', 'BCDEHIJL':'EJBCHDLI', 'BCDEHIKL':'EIBCHDLK', 'BCDEHJKL':'EJBCHDLK',
+    'BCDEIJKL':'EJBCIDLK', 'BCDFGHIJ':'HGBCJFDI', 'BCDFGHIK':'CGBDHFIK', 'BCDFGHIL':'CGBDHFLI',
+    'BCDFGHJK':'HGBCJFDK', 'BCDFGHJL':'CGBDHFLJ', 'BCDFGHKL':'CGBDHFLK', 'BCDFGIJK':'CGBDJFIK',
+    'BCDFGIJL':'CGBDJFLI', 'BCDFGIKL':'CGBDIFLK', 'BCDFGJKL':'CGBDJFLK', 'BCDFHIJK':'CJBDHFIK',
+    'BCDFHIJL':'CJBDHFLI', 'BCDFHIKL':'CIBDHFLK', 'BCDFHJKL':'CJBDHFLK', 'BCDFIJKL':'CJBDIFLK',
+    'BCDGHIJK':'HGBCJDIK', 'BCDGHIJL':'HGBCJDLI', 'BCDGHIKL':'HGBCIDLK', 'BCDGHJKL':'HGBCJDLK',
+    'BCDGIJKL':'IGBCJDLK', 'BCDHIJKL':'HJBCIDLK', 'BCEFGHIJ':'HGBCJFEI', 'BCEFGHIK':'EGBCHFIK',
+    'BCEFGHIL':'EGBCHFLI', 'BCEFGHJK':'HGBCJFEK', 'BCEFGHJL':'HGBCJFLE', 'BCEFGHKL':'EGBCHFLK',
+    'BCEFGIJK':'EGBCJFIK', 'BCEFGIJL':'EGBCJFLI', 'BCEFGIKL':'EGBCIFLK', 'BCEFGJKL':'EGBCJFLK',
+    'BCEFHIJK':'EJBCHFIK', 'BCEFHIJL':'EJBCHFLI', 'BCEFHIKL':'EIBCHFLK', 'BCEFHJKL':'EJBCHFLK',
+    'BCEFIJKL':'EJBCIFLK', 'BCEGHIJK':'EJBCHGIK', 'BCEGHIJL':'EJBCHGLI', 'BCEGHIKL':'EGBCIHLK',
+    'BCEGHJKL':'EJBCHGLK', 'BCEGIJKL':'EJBCIGLK', 'BCEHIJKL':'EJBCIHLK', 'BCFGHIJK':'HGBCJFIK',
+    'BCFGHIJL':'HGBCJFLI', 'BCFGHIKL':'HGBCIFLK', 'BCFGHJKL':'HGBCJFLK', 'BCFGIJKL':'IGBCJFLK',
+    'BCFHIJKL':'HJBCIFLK', 'BCGHIJKL':'HJBCIGLK', 'BDEFGHIJ':'HGBDJFEI', 'BDEFGHIK':'EGBDHFIK',
+    'BDEFGHIL':'EGBDHFLI', 'BDEFGHJK':'HGBDJFEK', 'BDEFGHJL':'HGBDJFLE', 'BDEFGHKL':'EGBDHFLK',
+    'BDEFGIJK':'EGBDJFIK', 'BDEFGIJL':'EGBDJFLI', 'BDEFGIKL':'EGBDIFLK', 'BDEFGJKL':'EGBDJFLK',
+    'BDEFHIJK':'EJBDHFIK', 'BDEFHIJL':'EJBDHFLI', 'BDEFHIKL':'EIBDHFLK', 'BDEFHJKL':'EJBDHFLK',
+    'BDEFIJKL':'EJBDIFLK', 'BDEGHIJK':'EJBDHGIK', 'BDEGHIJL':'EJBDHGLI', 'BDEGHIKL':'EGBDIHLK',
+    'BDEGHJKL':'EJBDHGLK', 'BDEGIJKL':'EJBDIGLK', 'BDEHIJKL':'EJBDIHLK', 'BDFGHIJK':'HGBDJFIK',
+    'BDFGHIJL':'HGBDJFLI', 'BDFGHIKL':'HGBDIFLK', 'BDFGHJKL':'HGBDJFLK', 'BDFGIJKL':'IGBDJFLK',
+    'BDFHIJKL':'HJBDIFLK', 'BDGHIJKL':'HJBDIGLK', 'BEFGHIJK':'EJBFHGIK', 'BEFGHIJL':'EJBFHGLI',
+    'BEFGHIKL':'EGBFIHLK', 'BEFGHJKL':'EJBFHGLK', 'BEFGIJKL':'EJBFIGLK', 'BEFHIJKL':'EJBFIHLK',
+    'BEGHIJKL':'EJIBHGLK', 'BFGHIJKL':'HJBFIGLK', 'CDEFGHIJ':'CGJDHFEI', 'CDEFGHIK':'CGEDHFIK',
+    'CDEFGHIL':'CGEDHFLI', 'CDEFGHJK':'CGJDHFEK', 'CDEFGHJL':'CGJDHFLE', 'CDEFGHKL':'CGEDHFLK',
+    'CDEFGIJK':'CGEDJFIK', 'CDEFGIJL':'CGEDJFLI', 'CDEFGIKL':'CGEDIFLK', 'CDEFGJKL':'CGEDJFLK',
+    'CDEFHIJK':'CJEDHFIK', 'CDEFHIJL':'CJEDHFLI', 'CDEFHIKL':'CEIDHFLK', 'CDEFHJKL':'CJEDHFLK',
+    'CDEFIJKL':'CJEDIFLK', 'CDEGHIJK':'EGJCHDIK', 'CDEGHIJL':'EGJCHDLI', 'CDEGHIKL':'EGICHDLK',
+    'CDEGHJKL':'EGJCHDLK', 'CDEGIJKL':'EGICJDLK', 'CDEHIJKL':'EJICHDLK', 'CDFGHIJK':'CGJDHFIK',
+    'CDFGHIJL':'CGJDHFLI', 'CDFGHIKL':'CGIDHFLK', 'CDFGHJKL':'CGJDHFLK', 'CDFGIJKL':'CGIDJFLK',
+    'CDFHIJKL':'CJIDHFLK', 'CDGHIJKL':'HGICJDLK', 'CEFGHIJK':'EGJCHFIK', 'CEFGHIJL':'EGJCHFLI',
+    'CEFGHIKL':'EGICHFLK', 'CEFGHJKL':'EGJCHFLK', 'CEFGIJKL':'EGICJFLK', 'CEFHIJKL':'EJICHFLK',
+    'CEGHIJKL':'EJICHGLK', 'CFGHIJKL':'HGICJFLK', 'DEFGHIJK':'EGJDHFIK', 'DEFGHIJL':'EGJDHFLI',
+    'DEFGHIKL':'EGIDHFLK', 'DEFGHJKL':'EGJDHFLK', 'DEFGIJKL':'EGIDJFLK', 'DEFHIJKL':'EJIDHFLK',
+    'DEGHIJKL':'EJIDHGLK', 'DFGHIJKL':'HGIDJFLK', 'EFGHIJKL':'EJIFHGLK'
+  };
+}
+
+// Map a set of eight qualifying third-place groups to bracket slots using
+// the official allocation table. Returns { '1A': group, ... } for the eight
+// winner slots that face a third, or null when the input is not exactly
+// eight distinct known groups (i.e. no matching combination).
+function assignThirds(qualifiedGroups) {
+  if (!Array.isArray(qualifiedGroups) || qualifiedGroups.length !== 8) return null;
+  const key = qualifiedGroups.slice().sort().join('');
+  const packed = getThirdPlaceAllocation()[key];
+  if (!packed) return null;
+  const slots = ['1A', '1B', '1D', '1E', '1G', '1I', '1K', '1L'];
+  const out = {};
+  for (let i = 0; i < slots.length; i++) out[slots[i]] = packed[i];
+  return out;
+}
+
+// Resolve Round-of-32 matchups (match_id 73–88) from group standings.
+// Input: array of { group, code, pts, gd, gf }. Output: a map from
+// match_id to { home, away } team codes. A `1X` / `2X` seed resolves to a
+// group winner / runner-up; a `3 XXXXX` seed resolves through the partner
+// winner slot via the allocation table. Any side that cannot be resolved
+// (group stage incomplete, thirds not yet decidable) is set to null so the
+// caller can skip writing it.
+function resolveR32(standings, matches) {
+  const byGroup = {};
+  standings.forEach(t => {
+    if (!byGroup[t.group]) byGroup[t.group] = [];
+    byGroup[t.group].push(t);
+  });
+
+  const winner = {}, runnerUp = {}, thirdByGroup = {};
+  const thirds = [];
+  Object.keys(byGroup).forEach(g => {
+    const codes = {};
+    byGroup[g].forEach(t => { codes[t.code] = true; });
+    const groupMatches = (matches || []).filter(m => codes[m.team1] && codes[m.team2]);
+    const clinched = resolveClinchedGroupRanks(byGroup[g], groupMatches);
+    if (clinched.winner) winner[g] = clinched.winner;
+    if (clinched.runnerUp) runnerUp[g] = clinched.runnerUp;
+  });
+
+  // Cross-group third-place ranking is safe only after all twelve groups
+  // have complete final standings. Until then those slots remain empty.
+  const groupLetters = 'ABCDEFGHIJKL'.split('');
+  const thirdsFinal = groupLetters.every(g =>
+    byGroup[g] && byGroup[g].length === 4 &&
+    byGroup[g].every(t => (t.played === undefined ? 3 : Number(t.played)) === 3)
+  );
+  if (thirdsFinal) {
+    groupLetters.forEach(g => {
+      const codes = {};
+      byGroup[g].forEach(t => { codes[t.code] = true; });
+      const groupMatches = (matches || []).filter(m => codes[m.team1] && codes[m.team2]);
+      const third = rankGroup(byGroup[g], groupMatches)[2];
+      if (third) { thirdByGroup[g] = third.code; thirds.push(third); }
+    });
+  }
+  const qualified = thirdsFinal ? rankThirds(thirds).slice(0, 8) : [];
+  const slotToGroup = thirdsFinal ? assignThirds(qualified.map(t => t.group)) : null;
+
+  function resolveSeed(seed, partnerSeed) {
+    const m = /^([12])([A-L])$/.exec(seed);
+    if (m) return (m[1] === '1' ? winner : runnerUp)[m[2]] || null;
+    if (/^3\s/.test(seed)) {
+      if (!slotToGroup) return null;
+      const grp = slotToGroup[partnerSeed]; // partner is the `1X` winner slot
+      return grp ? (thirdByGroup[grp] || null) : null;
+    }
+    return null;
+  }
+
+  const seedMap = getR32SeedMap();
+  const out = {};
+  Object.keys(seedMap).forEach(id => {
+    const seeds = seedMap[id];
+    out[id] = {
+      home: resolveSeed(seeds[0], seeds[1]),
+      away: resolveSeed(seeds[1], seeds[0])
+    };
+  });
+  return out;
+}
+
+// True only when at least one group-stage match exists and every one is
+// finished. Guards resolution from writing provisional knockout teams
+// (which the row[6]-already-filled rule would then lock in).
+function isGroupStageComplete(matches) {
+  const groupMatches = matches.filter(m => m.phase === '小組賽');
+  if (groupMatches.length === 0) return false;
+  return groupMatches.every(m => m.status === 'finished');
 }
 
 function setupSyncTrigger() {
