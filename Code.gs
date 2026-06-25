@@ -10,6 +10,20 @@ const TEAM_FLAGS_BY_CODE = {
   ENG: String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f),
   SCO: String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0073, 0xe0063, 0xe0074, 0xe007f)
 };
+const OFFICIAL_GROUP_BY_CODE_2026 = {
+  MEX: 'A', RSA: 'A', KOR: 'A', CZE: 'A',
+  CAN: 'B', BIH: 'B', SUI: 'B', QAT: 'B',
+  BRA: 'C', MAR: 'C', HAI: 'C', SCO: 'C',
+  USA: 'D', PAR: 'D', AUS: 'D', TUR: 'D',
+  GER: 'E', CIV: 'E', ECU: 'E', CUW: 'E',
+  NED: 'F', JPN: 'F', SWE: 'F', TUN: 'F',
+  BEL: 'G', EGY: 'G', IRN: 'G', NZL: 'G',
+  ESP: 'H', CPV: 'H', KSA: 'H', URU: 'H',
+  FRA: 'I', SEN: 'I', IRQ: 'I', NOR: 'I',
+  ARG: 'J', ALG: 'J', AUT: 'J', JOR: 'J',
+  POR: 'K', CGO: 'K', UZB: 'K', COL: 'K',
+  ENG: 'L', CRO: 'L', GHA: 'L', PAN: 'L'
+};
 // ────────────────────────────────────────────
 
 // ── Custom Menu ───────────────────────────────
@@ -24,6 +38,7 @@ function onOpen() {
       .addItem('建立/刷新比分編輯分頁', 'refreshScoreEditorSheet')
       .addItem('套用比分編輯分頁', 'applyScoreEditorSheet')
       .addItem('統一中文譯名', 'normalizeTeamNamesInSheets')
+      .addItem('修正 2026 分組字母', 'fixOfficialGroupAssignments2026')
       .addSeparator()
       .addItem('Recalc Group Standings', 'recalcGroups')
       .addItem('Sync Bracket (Knockout Teams)', 'syncBracket')
@@ -163,6 +178,57 @@ function normalizeTeamName_(name) {
 
 function normalizeTeamFlag_(code, flag) {
   return TEAM_FLAGS_BY_CODE[String(code || '')] || String(flag || '');
+}
+
+function fixOfficialGroupAssignments2026(showAlert) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const matches = ss.getSheetByName('matches');
+  const groups = ss.getSheetByName('groups');
+  let changed = 0;
+  const errors = [];
+
+  if (matches && matches.getLastRow() > 1) {
+    const lastRow = matches.getLastRow();
+    const rows = matches.getRange(2, 1, lastRow - 1, 18).getValues();
+    const groupsCol = rows.map((r, idx) => {
+      const currentGroup = String(r[4] || '');
+      const homeCode = String(r[6] || '');
+      const awayCode = String(r[9] || '');
+      const expectedHome = OFFICIAL_GROUP_BY_CODE_2026[homeCode];
+      const expectedAway = OFFICIAL_GROUP_BY_CODE_2026[awayCode];
+      const nextGroup = expectedHome || currentGroup;
+
+      if (currentGroup && expectedHome && expectedAway && expectedHome !== expectedAway) {
+        errors.push(`matches 第 ${idx + 2} 列：${homeCode}/${awayCode} 分屬不同組`);
+      }
+      if (currentGroup && expectedHome && currentGroup !== nextGroup) changed++;
+      return [currentGroup && expectedHome ? nextGroup : currentGroup];
+    });
+    if (groupsCol.length) matches.getRange(2, 5, groupsCol.length, 1).setValues(groupsCol);
+  }
+
+  if (groups && groups.getLastRow() > 1) {
+    const lastRow = groups.getLastRow();
+    const rows = groups.getRange(2, 1, lastRow - 1, 12).getValues();
+    const groupsCol = rows.map(r => {
+      const currentGroup = String(r[0] || '');
+      const code = String(r[1] || '');
+      const nextGroup = OFFICIAL_GROUP_BY_CODE_2026[code] || currentGroup;
+      if (currentGroup && nextGroup && currentGroup !== nextGroup) changed++;
+      return [nextGroup];
+    });
+    if (groupsCol.length) groups.getRange(2, 1, groupsCol.length, 1).setValues(groupsCol);
+  }
+
+  if (errors.length) throw new Error(errors.join('\n'));
+
+  recalcGroups();
+  touchDataVersion();
+  try { refreshScoreEditorSheet(false); } catch (_) {}
+
+  if (showAlert !== false) {
+    try { SpreadsheetApp.getUi().alert(`2026 分組字母已修正，更新 ${changed} 個儲存格，積分已重算。`); } catch (_) {}
+  }
 }
 
 function setupSheetValidation() {
@@ -1180,6 +1246,7 @@ function testDiag() {
 // ─── getMatches ───────────────────────────────
 
 function getMatches(params) {
+  params = params || {};
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('matches');
   const rows  = sheet.getDataRange().getValues();
   rows.shift(); // remove header row
@@ -1215,6 +1282,7 @@ function getMatches(params) {
 // ─── getGroups ────────────────────────────────
 
 function getGroups(params) {
+  params = params || {};
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('groups');
   const rows  = sheet.getDataRange().getValues();
   rows.shift();
@@ -1399,77 +1467,77 @@ function initializeMatches() {
     [1,  '2026-06-12', '03:00', '小組賽', 'A', 1, 'MEX', '墨西哥', '🇲🇽', 'RSA', '南非',       '🇿🇦', '', '', 'upcoming', 'Estadio Banorte',                    '墨西哥城'],
     [2,  '2026-06-12', '10:00', '小組賽', 'A', 1, 'KOR', '韓國',   '🇰🇷', 'CZE', '捷克',       '🇨🇿', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
     [3,  '2026-06-13', '03:00', '小組賽', 'B', 1, 'CAN', '加拿大', '🇨🇦', 'BIH', '波赫',   '🇧🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
-    [4,  '2026-06-13', '09:00', '小組賽', 'C', 1, 'USA', '美國',   '🇺🇸', 'PAR', '巴拉圭',     '🇵🇾', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
+    [4,  '2026-06-13', '09:00', '小組賽', 'D', 1, 'USA', '美國',   '🇺🇸', 'PAR', '巴拉圭',     '🇵🇾', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
     [5,  '2026-06-14', '03:00', '小組賽', 'B', 1, 'QAT', '卡達',   '🇶🇦', 'SUI', '瑞士',       '🇨🇭', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
-    [6,  '2026-06-14', '06:00', '小組賽', 'D', 1, 'BRA', '巴西',   '🇧🇷', 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
-    [7,  '2026-06-14', '09:00', '小組賽', 'D', 1, 'HAI', '海地',   '🇭🇹', 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
-    [8,  '2026-06-14', '12:00', '小組賽', 'C', 1, 'AUS', '澳洲',   '🇦🇺', 'TUR', '土耳其',     '🇹🇷', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
+    [6,  '2026-06-14', '06:00', '小組賽', 'C', 1, 'BRA', '巴西',   '🇧🇷', 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
+    [7,  '2026-06-14', '09:00', '小組賽', 'C', 1, 'HAI', '海地',   '🇭🇹', 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [8,  '2026-06-14', '12:00', '小組賽', 'D', 1, 'AUS', '澳洲',   '🇦🇺', 'TUR', '土耳其',     '🇹🇷', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
     [9,  '2026-06-15', '01:00', '小組賽', 'E', 1, 'GER', '德國',   '🇩🇪', 'CUW', '古拉索',     '🇨🇼', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
     [10, '2026-06-15', '04:00', '小組賽', 'F', 1, 'NED', '荷蘭',   '🇳🇱', 'JPN', '日本',       '🇯🇵', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     [11, '2026-06-15', '07:00', '小組賽', 'E', 1, 'CIV', '象牙海岸','🇨🇮', 'ECU', '厄瓜多',     '🇪🇨', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
     [12, '2026-06-15', '10:00', '小組賽', 'F', 1, 'SWE', '瑞典',   '🇸🇪', 'TUN', '突尼西亞',   '🇹🇳', '', '', 'upcoming', 'Estadio BBVA',                       '蒙特雷'],
-    [13, '2026-06-16', '00:00', '小組賽', 'G', 1, 'ESP', '西班牙', '🇪🇸', 'CPV', '維德角',     '🇨🇻', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
-    [14, '2026-06-16', '03:00', '小組賽', 'H', 1, 'BEL', '比利時', '🇧🇪', 'EGY', '埃及',       '🇪🇬', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
-    [15, '2026-06-16', '06:00', '小組賽', 'G', 1, 'KSA', '沙烏地阿拉伯','🇸🇦','URU','烏拉圭',  '🇺🇾', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
-    [16, '2026-06-16', '09:00', '小組賽', 'H', 1, 'IRN', '伊朗',   '🇮🇷', 'NZL', '紐西蘭',     '🇳🇿', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
-    [17, '2026-06-17', '03:00', '小組賽', 'J', 1, 'FRA', '法國',   '🇫🇷', 'SEN', '塞內加爾',   '🇸🇳', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
-    [18, '2026-06-17', '06:00', '小組賽', 'J', 1, 'IRQ', '伊拉克', '🇮🇶', 'NOR', '挪威',       '🇳🇴', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
-    [19, '2026-06-17', '09:00', '小組賽', 'I', 1, 'ARG', '阿根廷', '🇦🇷', 'ALG', '阿爾及利亞', '🇩🇿', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
-    [20, '2026-06-17', '12:00', '小組賽', 'I', 1, 'AUT', '奧地利', '🇦🇹', 'JOR', '約旦',       '🇯🇴', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
-    [21, '2026-06-18', '01:00', '小組賽', 'L', 1, 'POR', '葡萄牙', '🇵🇹', 'CGO', '民主剛果',       '🇨🇩', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
-    [22, '2026-06-18', '04:00', '小組賽', 'K', 1, 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
-    [23, '2026-06-18', '07:00', '小組賽', 'K', 1, 'GHA', '迦納',   '🇬🇭', 'PAN', '巴拿馬',     '🇵🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
-    [24, '2026-06-18', '10:00', '小組賽', 'L', 1, 'UZB', '烏茲別克','🇺🇿','COL', '哥倫比亞',   '🇨🇴', '', '', 'upcoming', 'Estadio Banorte',                    '墨西哥城'],
+    [13, '2026-06-16', '00:00', '小組賽', 'H', 1, 'ESP', '西班牙', '🇪🇸', 'CPV', '維德角',     '🇨🇻', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
+    [14, '2026-06-16', '03:00', '小組賽', 'G', 1, 'BEL', '比利時', '🇧🇪', 'EGY', '埃及',       '🇪🇬', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
+    [15, '2026-06-16', '06:00', '小組賽', 'H', 1, 'KSA', '沙烏地阿拉伯','🇸🇦','URU','烏拉圭',  '🇺🇾', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
+    [16, '2026-06-16', '09:00', '小組賽', 'G', 1, 'IRN', '伊朗',   '🇮🇷', 'NZL', '紐西蘭',     '🇳🇿', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
+    [17, '2026-06-17', '03:00', '小組賽', 'I', 1, 'FRA', '法國',   '🇫🇷', 'SEN', '塞內加爾',   '🇸🇳', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
+    [18, '2026-06-17', '06:00', '小組賽', 'I', 1, 'IRQ', '伊拉克', '🇮🇶', 'NOR', '挪威',       '🇳🇴', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [19, '2026-06-17', '09:00', '小組賽', 'J', 1, 'ARG', '阿根廷', '🇦🇷', 'ALG', '阿爾及利亞', '🇩🇿', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
+    [20, '2026-06-17', '12:00', '小組賽', 'J', 1, 'AUT', '奧地利', '🇦🇹', 'JOR', '約旦',       '🇯🇴', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
+    [21, '2026-06-18', '01:00', '小組賽', 'K', 1, 'POR', '葡萄牙', '🇵🇹', 'CGO', '民主剛果',       '🇨🇩', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
+    [22, '2026-06-18', '04:00', '小組賽', 'L', 1, 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
+    [23, '2026-06-18', '07:00', '小組賽', 'L', 1, 'GHA', '迦納',   '🇬🇭', 'PAN', '巴拿馬',     '🇵🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
+    [24, '2026-06-18', '10:00', '小組賽', 'K', 1, 'UZB', '烏茲別克','🇺🇿','COL', '哥倫比亞',   '🇨🇴', '', '', 'upcoming', 'Estadio Banorte',                    '墨西哥城'],
     // ── GROUP STAGE - MATCHDAY 2 ──────────────────────────────────────────────
     [25, '2026-06-19', '00:00', '小組賽', 'A', 2, 'CZE', '捷克',   '🇨🇿', 'RSA', '南非',       '🇿🇦', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
     [26, '2026-06-19', '03:00', '小組賽', 'B', 2, 'SUI', '瑞士',   '🇨🇭', 'BIH', '波赫',   '🇧🇦', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
     [27, '2026-06-19', '06:00', '小組賽', 'B', 2, 'CAN', '加拿大', '🇨🇦', 'QAT', '卡達',       '🇶🇦', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
     [28, '2026-06-19', '09:00', '小組賽', 'A', 2, 'MEX', '墨西哥', '🇲🇽', 'KOR', '韓國',       '🇰🇷', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
-    [29, '2026-06-20', '03:00', '小組賽', 'C', 2, 'USA', '美國',   '🇺🇸', 'AUS', '澳洲',       '🇦🇺', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
-    [30, '2026-06-20', '06:00', '小組賽', 'D', 2, 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
-    [31, '2026-06-20', '08:30', '小組賽', 'D', 2, 'BRA', '巴西',   '🇧🇷', 'HAI', '海地',       '🇭🇹', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
-    [32, '2026-06-20', '11:00', '小組賽', 'C', 2, 'TUR', '土耳其', '🇹🇷', 'PAR', '巴拉圭',     '🇵🇾', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
+    [29, '2026-06-20', '03:00', '小組賽', 'D', 2, 'USA', '美國',   '🇺🇸', 'AUS', '澳洲',       '🇦🇺', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
+    [30, '2026-06-20', '06:00', '小組賽', 'C', 2, 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, 'MAR', '摩洛哥',     '🇲🇦', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [31, '2026-06-20', '08:30', '小組賽', 'C', 2, 'BRA', '巴西',   '🇧🇷', 'HAI', '海地',       '🇭🇹', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
+    [32, '2026-06-20', '11:00', '小組賽', 'D', 2, 'TUR', '土耳其', '🇹🇷', 'PAR', '巴拉圭',     '🇵🇾', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
     [33, '2026-06-21', '01:00', '小組賽', 'F', 2, 'NED', '荷蘭',   '🇳🇱', 'SWE', '瑞典',       '🇸🇪', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
     [34, '2026-06-21', '04:00', '小組賽', 'E', 2, 'GER', '德國',   '🇩🇪', 'CIV', '象牙海岸',   '🇨🇮', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
     [35, '2026-06-21', '08:00', '小組賽', 'E', 2, 'ECU', '厄瓜多', '🇪🇨', 'CUW', '古拉索',     '🇨🇼', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
     [36, '2026-06-21', '12:00', '小組賽', 'F', 2, 'TUN', '突尼西亞','🇹🇳','JPN', '日本',       '🇯🇵', '', '', 'upcoming', 'Estadio BBVA',                       '蒙特雷'],
-    [37, '2026-06-22', '00:00', '小組賽', 'G', 2, 'ESP', '西班牙', '🇪🇸', 'KSA', '沙烏地阿拉伯','🇸🇦','', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
-    [38, '2026-06-22', '03:00', '小組賽', 'H', 2, 'BEL', '比利時', '🇧🇪', 'IRN', '伊朗',       '🇮🇷', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
-    [39, '2026-06-22', '06:00', '小組賽', 'G', 2, 'URU', '烏拉圭', '🇺🇾', 'CPV', '維德角',     '🇨🇻', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
-    [40, '2026-06-22', '09:00', '小組賽', 'H', 2, 'EGY', '埃及',   '🇪🇬', 'NZL', '紐西蘭',     '🇳🇿', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
-    [41, '2026-06-23', '01:00', '小組賽', 'I', 2, 'ARG', '阿根廷', '🇦🇷', 'AUT', '奧地利',     '🇦🇹', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
-    [42, '2026-06-23', '05:00', '小組賽', 'J', 2, 'FRA', '法國',   '🇫🇷', 'IRQ', '伊拉克',     '🇮🇶', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
-    [43, '2026-06-23', '08:00', '小組賽', 'J', 2, 'SEN', '塞內加爾','🇸🇳','NOR', '挪威',       '🇳🇴', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
-    [44, '2026-06-23', '11:00', '小組賽', 'I', 2, 'ALG', '阿爾及利亞','🇩🇿','JOR','約旦',      '🇯🇴', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
-    [45, '2026-06-24', '01:00', '小組賽', 'L', 2, 'POR', '葡萄牙', '🇵🇹', 'UZB', '烏茲別克',   '🇺🇿', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
-    [46, '2026-06-24', '04:00', '小組賽', 'K', 2, 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, 'GHA', '迦納',       '🇬🇭', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
-    [47, '2026-06-24', '07:00', '小組賽', 'K', 2, 'CRO', '克羅埃西亞','🇭🇷','PAN','巴拿馬',    '🇵🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
-    [48, '2026-06-24', '10:00', '小組賽', 'L', 2, 'COL', '哥倫比亞','🇨🇴','CGO','民主剛果',        '🇨🇩', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
+    [37, '2026-06-22', '00:00', '小組賽', 'H', 2, 'ESP', '西班牙', '🇪🇸', 'KSA', '沙烏地阿拉伯','🇸🇦','', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
+    [38, '2026-06-22', '03:00', '小組賽', 'G', 2, 'BEL', '比利時', '🇧🇪', 'IRN', '伊朗',       '🇮🇷', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
+    [39, '2026-06-22', '06:00', '小組賽', 'H', 2, 'URU', '烏拉圭', '🇺🇾', 'CPV', '維德角',     '🇨🇻', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
+    [40, '2026-06-22', '09:00', '小組賽', 'G', 2, 'EGY', '埃及',   '🇪🇬', 'NZL', '紐西蘭',     '🇳🇿', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
+    [41, '2026-06-23', '01:00', '小組賽', 'J', 2, 'ARG', '阿根廷', '🇦🇷', 'AUT', '奧地利',     '🇦🇹', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
+    [42, '2026-06-23', '05:00', '小組賽', 'I', 2, 'FRA', '法國',   '🇫🇷', 'IRQ', '伊拉克',     '🇮🇶', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
+    [43, '2026-06-23', '08:00', '小組賽', 'I', 2, 'SEN', '塞內加爾','🇸🇳','NOR', '挪威',       '🇳🇴', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
+    [44, '2026-06-23', '11:00', '小組賽', 'J', 2, 'ALG', '阿爾及利亞','🇩🇿','JOR','約旦',      '🇯🇴', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
+    [45, '2026-06-24', '01:00', '小組賽', 'K', 2, 'POR', '葡萄牙', '🇵🇹', 'UZB', '烏茲別克',   '🇺🇿', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
+    [46, '2026-06-24', '04:00', '小組賽', 'L', 2, 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, 'GHA', '迦納',       '🇬🇭', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [47, '2026-06-24', '07:00', '小組賽', 'L', 2, 'CRO', '克羅埃西亞','🇭🇷','PAN','巴拿馬',    '🇵🇦', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
+    [48, '2026-06-24', '10:00', '小組賽', 'K', 2, 'COL', '哥倫比亞','🇨🇴','CGO','民主剛果',        '🇨🇩', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
     // ── GROUP STAGE - MATCHDAY 3 ──────────────────────────────────────────────
     [49, '2026-06-25', '03:00', '小組賽', 'B', 3, 'BIH', '波赫','🇧🇦','QAT', '卡達',       '🇶🇦', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
     [50, '2026-06-25', '03:00', '小組賽', 'B', 3, 'SUI', '瑞士',   '🇨🇭', 'CAN', '加拿大',     '🇨🇦', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
-    [51, '2026-06-25', '06:00', '小組賽', 'D', 3, 'MAR', '摩洛哥', '🇲🇦', 'HAI', '海地',       '🇭🇹', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
-    [52, '2026-06-25', '06:00', '小組賽', 'D', 3, 'BRA', '巴西',   '🇧🇷', 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
+    [51, '2026-06-25', '06:00', '小組賽', 'C', 3, 'MAR', '摩洛哥', '🇲🇦', 'HAI', '海地',       '🇭🇹', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
+    [52, '2026-06-25', '06:00', '小組賽', 'C', 3, 'BRA', '巴西',   '🇧🇷', 'SCO', '蘇格蘭',     TEAM_FLAGS_BY_CODE.SCO, '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
     [53, '2026-06-25', '09:00', '小組賽', 'A', 3, 'MEX', '墨西哥', '🇲🇽', 'CZE', '捷克',       '🇨🇿', '', '', 'upcoming', 'Estadio Banorte',                    '墨西哥城'],
     [54, '2026-06-25', '09:00', '小組賽', 'A', 3, 'KOR', '韓國',   '🇰🇷', 'RSA', '南非',       '🇿🇦', '', '', 'upcoming', 'Estadio BBVA',                       '蒙特雷'],
     [55, '2026-06-26', '04:00', '小組賽', 'E', 3, 'CUW', '古拉索', '🇨🇼', 'CIV', '象牙海岸',   '🇨🇮', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
     [56, '2026-06-26', '04:00', '小組賽', 'E', 3, 'ECU', '厄瓜多', '🇪🇨', 'GER', '德國',       '🇩🇪', '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
     [57, '2026-06-26', '07:00', '小組賽', 'F', 3, 'JPN', '日本',   '🇯🇵', 'SWE', '瑞典',       '🇸🇪', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     [58, '2026-06-26', '07:00', '小組賽', 'F', 3, 'TUN', '突尼西亞','🇹🇳','NED', '荷蘭',       '🇳🇱', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
-    [59, '2026-06-26', '10:00', '小組賽', 'C', 3, 'PAR', '巴拉圭', '🇵🇾', 'AUS', '澳洲',       '🇦🇺', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
-    [60, '2026-06-26', '10:00', '小組賽', 'C', 3, 'TUR', '土耳其', '🇹🇷', 'USA', '美國',       '🇺🇸', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
-    [61, '2026-06-27', '03:00', '小組賽', 'J', 3, 'NOR', '挪威',   '🇳🇴', 'FRA', '法國',       '🇫🇷', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
-    [62, '2026-06-27', '03:00', '小組賽', 'J', 3, 'IRQ', '伊拉克', '🇮🇶', 'SEN', '塞內加爾',   '🇸🇳', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
-    [63, '2026-06-27', '08:00', '小組賽', 'G', 3, 'CPV', '維德角', '🇨🇻', 'KSA', '沙烏地阿拉伯','🇸🇦','', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
-    [64, '2026-06-27', '08:00', '小組賽', 'G', 3, 'URU', '烏拉圭', '🇺🇾', 'ESP', '西班牙',     '🇪🇸', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
-    [65, '2026-06-27', '11:00', '小組賽', 'H', 3, 'EGY', '埃及',   '🇪🇬', 'IRN', '伊朗',       '🇮🇷', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
-    [66, '2026-06-27', '11:00', '小組賽', 'H', 3, 'NZL', '紐西蘭', '🇳🇿', 'BEL', '比利時',     '🇧🇪', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
-    [67, '2026-06-28', '05:00', '小組賽', 'K', 3, 'GHA', '迦納',   '🇬🇭', 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
-    [68, '2026-06-28', '05:00', '小組賽', 'K', 3, 'PAN', '巴拿馬', '🇵🇦', 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
-    [69, '2026-06-28', '07:30', '小組賽', 'L', 3, 'COL', '哥倫比亞','🇨🇴','POR', '葡萄牙',     '🇵🇹', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
-    [70, '2026-06-28', '07:30', '小組賽', 'L', 3, 'UZB', '烏茲別克','🇺🇿','CGO','民主剛果',        '🇨🇩', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
-    [71, '2026-06-28', '10:00', '小組賽', 'I', 3, 'ALG', '阿爾及利亞','🇩🇿','AUT','奧地利',    '🇦🇹', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
-    [72, '2026-06-28', '10:00', '小組賽', 'I', 3, 'JOR', '約旦',   '🇯🇴', 'ARG', '阿根廷',     '🇦🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
+    [59, '2026-06-26', '10:00', '小組賽', 'D', 3, 'PAR', '巴拉圭', '🇵🇾', 'AUS', '澳洲',       '🇦🇺', '', '', 'upcoming', "Levi's Stadium",                     '舊金山'],
+    [60, '2026-06-26', '10:00', '小組賽', 'D', 3, 'TUR', '土耳其', '🇹🇷', 'USA', '美國',       '🇺🇸', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
+    [61, '2026-06-27', '03:00', '小組賽', 'I', 3, 'NOR', '挪威',   '🇳🇴', 'FRA', '法國',       '🇫🇷', '', '', 'upcoming', 'Gillette Stadium',                   '波士頓'],
+    [62, '2026-06-27', '03:00', '小組賽', 'I', 3, 'IRQ', '伊拉克', '🇮🇶', 'SEN', '塞內加爾',   '🇸🇳', '', '', 'upcoming', 'BMO Field',                          '多倫多'],
+    [63, '2026-06-27', '08:00', '小組賽', 'H', 3, 'CPV', '維德角', '🇨🇻', 'KSA', '沙烏地阿拉伯','🇸🇦','', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
+    [64, '2026-06-27', '08:00', '小組賽', 'H', 3, 'URU', '烏拉圭', '🇺🇾', 'ESP', '西班牙',     '🇪🇸', '', '', 'upcoming', 'Estadio Akron',                      '瓜達拉哈拉'],
+    [65, '2026-06-27', '11:00', '小組賽', 'G', 3, 'EGY', '埃及',   '🇪🇬', 'IRN', '伊朗',       '🇮🇷', '', '', 'upcoming', 'Lumen Field',                        '西雅圖'],
+    [66, '2026-06-27', '11:00', '小組賽', 'G', 3, 'NZL', '紐西蘭', '🇳🇿', 'BEL', '比利時',     '🇧🇪', '', '', 'upcoming', 'BC Place',                           '溫哥華'],
+    [67, '2026-06-28', '05:00', '小組賽', 'L', 3, 'GHA', '迦納',   '🇬🇭', 'CRO', '克羅埃西亞', '🇭🇷', '', '', 'upcoming', 'Lincoln Financial Field',            '費城'],
+    [68, '2026-06-28', '05:00', '小組賽', 'L', 3, 'PAN', '巴拿馬', '🇵🇦', 'ENG', '英格蘭', TEAM_FLAGS_BY_CODE.ENG, '', '', 'upcoming', 'MetLife Stadium',                    '紐約'],
+    [69, '2026-06-28', '07:30', '小組賽', 'K', 3, 'COL', '哥倫比亞','🇨🇴','POR', '葡萄牙',     '🇵🇹', '', '', 'upcoming', 'Hard Rock Stadium',                  '邁阿密'],
+    [70, '2026-06-28', '07:30', '小組賽', 'K', 3, 'UZB', '烏茲別克','🇺🇿','CGO','民主剛果',        '🇨🇩', '', '', 'upcoming', 'Mercedes-Benz Stadium',              '亞特蘭大'],
+    [71, '2026-06-28', '10:00', '小組賽', 'J', 3, 'ALG', '阿爾及利亞','🇩🇿','AUT','奧地利',    '🇦🇹', '', '', 'upcoming', 'GEHA Field at Arrowhead Stadium',    '堪薩斯城'],
+    [72, '2026-06-28', '10:00', '小組賽', 'J', 3, 'JOR', '約旦',   '🇯🇴', 'ARG', '阿根廷',     '🇦🇷', '', '', 'upcoming', 'AT&T Stadium',                       '達拉斯'],
     // ── ROUND OF 32 ───────────────────────────────────────────────────────────
     [73,  '2026-06-29', '03:00', '32強', '', 0, '', '', '', '', '', '', '', '', 'upcoming', 'SoFi Stadium',                       '洛杉磯'],
     [74,  '2026-06-30', '01:00', '32強', '', 0, '', '', '', '', '', '', '', '', 'upcoming', 'NRG Stadium',                        '休士頓'],
@@ -1536,15 +1604,15 @@ function initializeGroups() {
     ['B', 'SUI', '瑞士',     '🇨🇭', 0, 0, 0, 0, 0, 0, 0, 0],
     ['B', 'QAT', '卡達',     '🇶🇦', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group C ───────────────────────────────────────────────────────────────
-    ['C', 'USA', '美國',   '🇺🇸', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['C', 'PAR', '巴拉圭', '🇵🇾', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['C', 'AUS', '澳洲',   '🇦🇺', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['C', 'TUR', '土耳其', '🇹🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['C', 'BRA', '巴西',   '🇧🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['C', 'MAR', '摩洛哥', '🇲🇦', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['C', 'HAI', '海地',   '🇭🇹', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['C', 'SCO', '蘇格蘭', TEAM_FLAGS_BY_CODE.SCO, 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group D ───────────────────────────────────────────────────────────────
-    ['D', 'BRA', '巴西',   '🇧🇷', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['D', 'MAR', '摩洛哥', '🇲🇦', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['D', 'HAI', '海地',   '🇭🇹', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['D', 'SCO', '蘇格蘭', TEAM_FLAGS_BY_CODE.SCO, 0, 0, 0, 0, 0, 0, 0, 0],
+    ['D', 'USA', '美國',   '🇺🇸', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['D', 'PAR', '巴拉圭', '🇵🇾', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['D', 'AUS', '澳洲',   '🇦🇺', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['D', 'TUR', '土耳其', '🇹🇷', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group E ───────────────────────────────────────────────────────────────
     ['E', 'GER', '德國',     '🇩🇪', 0, 0, 0, 0, 0, 0, 0, 0],
     ['E', 'CIV', '象牙海岸', '🇨🇮', 0, 0, 0, 0, 0, 0, 0, 0],
@@ -1556,35 +1624,35 @@ function initializeGroups() {
     ['F', 'SWE', '瑞典',     '🇸🇪', 0, 0, 0, 0, 0, 0, 0, 0],
     ['F', 'TUN', '突尼西亞', '🇹🇳', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group G ───────────────────────────────────────────────────────────────
-    ['G', 'ESP', '西班牙',     '🇪🇸', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['G', 'CPV', '維德角',     '🇨🇻', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['G', 'KSA', '沙烏地阿拉伯','🇸🇦', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['G', 'URU', '烏拉圭',     '🇺🇾', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['G', 'BEL', '比利時', '🇧🇪', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['G', 'EGY', '埃及',   '🇪🇬', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['G', 'IRN', '伊朗',   '🇮🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['G', 'NZL', '紐西蘭', '🇳🇿', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group H ───────────────────────────────────────────────────────────────
-    ['H', 'BEL', '比利時', '🇧🇪', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['H', 'EGY', '埃及',   '🇪🇬', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['H', 'IRN', '伊朗',   '🇮🇷', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['H', 'NZL', '紐西蘭', '🇳🇿', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['H', 'ESP', '西班牙',     '🇪🇸', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['H', 'CPV', '維德角',     '🇨🇻', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['H', 'KSA', '沙烏地阿拉伯','🇸🇦', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['H', 'URU', '烏拉圭',     '🇺🇾', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group I ───────────────────────────────────────────────────────────────
-    ['I', 'ARG', '阿根廷',     '🇦🇷', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['I', 'ALG', '阿爾及利亞', '🇩🇿', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['I', 'AUT', '奧地利',     '🇦🇹', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['I', 'JOR', '約旦',       '🇯🇴', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['I', 'FRA', '法國',     '🇫🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['I', 'SEN', '塞內加爾', '🇸🇳', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['I', 'IRQ', '伊拉克',   '🇮🇶', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['I', 'NOR', '挪威',     '🇳🇴', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group J ───────────────────────────────────────────────────────────────
-    ['J', 'FRA', '法國',     '🇫🇷', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['J', 'SEN', '塞內加爾', '🇸🇳', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['J', 'IRQ', '伊拉克',   '🇮🇶', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['J', 'NOR', '挪威',     '🇳🇴', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['J', 'ARG', '阿根廷',     '🇦🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['J', 'ALG', '阿爾及利亞', '🇩🇿', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['J', 'AUT', '奧地利',     '🇦🇹', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['J', 'JOR', '約旦',       '🇯🇴', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group K ───────────────────────────────────────────────────────────────
-    ['K', 'ENG', '英格蘭',   TEAM_FLAGS_BY_CODE.ENG, 0, 0, 0, 0, 0, 0, 0, 0],
-    ['K', 'GHA', '迦納',     '🇬🇭', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['K', 'PAN', '巴拿馬',   '🇵🇦', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['K', 'CRO', '克羅埃西亞','🇭🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['K', 'POR', '葡萄牙',   '🇵🇹', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['K', 'UZB', '烏茲別克', '🇺🇿', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['K', 'COL', '哥倫比亞', '🇨🇴', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['K', 'CGO', '民主剛果',     '🇨🇩', 0, 0, 0, 0, 0, 0, 0, 0],
     // ── Group L ───────────────────────────────────────────────────────────────
-    ['L', 'POR', '葡萄牙',   '🇵🇹', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['L', 'UZB', '烏茲別克', '🇺🇿', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['L', 'COL', '哥倫比亞', '🇨🇴', 0, 0, 0, 0, 0, 0, 0, 0],
-    ['L', 'CGO', '民主剛果',     '🇨🇩', 0, 0, 0, 0, 0, 0, 0, 0]
+    ['L', 'ENG', '英格蘭',   TEAM_FLAGS_BY_CODE.ENG, 0, 0, 0, 0, 0, 0, 0, 0],
+    ['L', 'CRO', '克羅埃西亞','🇭🇷', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['L', 'GHA', '迦納',     '🇬🇭', 0, 0, 0, 0, 0, 0, 0, 0],
+    ['L', 'PAN', '巴拿馬',   '🇵🇦', 0, 0, 0, 0, 0, 0, 0, 0]
   ];
 
   if (data.length > 0) sheet.getRange(2, 1, data.length, 12).setValues(data);
