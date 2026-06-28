@@ -739,14 +739,14 @@ const GROUPS_INFO = {
 
 /* ── R32 seeding (WC 2026 official bracket) ─── */
 const R32_SEEDS = {
-  73: ['2A','2B'],      74: ['1E','3 ABCDF'],
-  75: ['1F','2C'],      76: ['1C','2F'],
-  77: ['1I','3 CDFGH'], 78: ['2E','2I'],
+  73: ['2A','2B'],      74: ['1C','2F'],
+  75: ['1E','3 ABCDF'], 76: ['1F','2C'],
+  77: ['2E','2I'],      78: ['1I','3 CDFGH'],
   79: ['1A','3 CEFHI'], 80: ['1L','3 EHIJK'],
-  81: ['1D','3 BEFIJ'], 82: ['1G','3 AEHIJ'],
-  83: ['2K','2L'],      84: ['1H','2J'],
-  85: ['1B','3 EFGIJ'], 86: ['1J','2H'],
-  87: ['1K','3 DEIJL'], 88: ['2D','2G'],
+  81: ['1G','3 AEHIJ'], 82: ['1D','3 BEFIJ'],
+  83: ['1H','2J'],      84: ['2K','2L'],
+  85: ['1B','3 EFGIJ'], 86: ['2D','2G'],
+  87: ['1J','2H'],      88: ['1K','3 DEIJL'],
 };
 
 /* Convert raw seed code to readable Chinese label */
@@ -895,9 +895,20 @@ function renderDesktop(matches) {
   const bp = {};
   matches.forEach(m => { (bp[m.phase] ??= []).push(m); });
 
-  const r32=bp[PHASE_R32]||[], r16=bp[PHASE_R16]||[];
-  const qf=bp[PHASE_QF]||[],   sf=bp[PHASE_SF]||[];
+  const r32raw=bp[PHASE_R32]||[], r16=bp[PHASE_R16]||[];
+  const qf=bp[PHASE_QF]||[],     sf=bp[PHASE_SF]||[];
   const fin=(bp[PHASE_F]||[])[0], t3=(bp[PHASE_3RD]||[])[0];
+
+  // Correct bracket order: pairs that feed into the same R16 match must be adjacent
+  // Code.gs match IDs (verified against venue/date): M74=BRA/JPN, M75=GER/PAR, M76=NED/MAR, M77=CIV/NOR, M78=FRA/SWE
+  // Left: (75,78)→R16M89, (73,76)→R16M90, (74,77)→R16M91, (79,80)→R16M92
+  // Right: (84,83)→R16M93, (82,81)→R16M94, (87,86)→R16M95, (85,88)→R16M96
+  const R32_ORDER = [75,78,73,76,74,77,79,80,84,83,82,81,87,86,85,88];
+  const r32ById = Object.fromEntries(r32raw.map(m => [m.match_id, m]));
+  const r32 = [
+    ...R32_ORDER.map(id => r32ById[id]).filter(Boolean),
+    ...r32raw.filter(m => !R32_ORDER.includes(m.match_id)),
+  ];
 
   const r32L=r32.slice(0,8), r32R=r32.slice(8,16);
   const r16L=r16.slice(0,4), r16R=r16.slice(4,8);
