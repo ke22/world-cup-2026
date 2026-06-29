@@ -717,6 +717,28 @@ function syncBracket() {
     Logger.log(`syncBracket: #${id} → ${next[1] || 'TBD'} vs ${next[4] || 'TBD'}`);
   });
 
+  // Advance knockout winners (and SF losers → 3rd place) through the bracket.
+  // Sources are read from the freshly-loaded sheet rows, so each finished round
+  // feeds the next; rounds not yet played leave their downstream slots blank.
+  const rowById = {};
+  rows.forEach((row, i) => {
+    const id = Number(row[0]);
+    if (id && i > 0) rowById[id] = { row, sheetRow: i + 1 };
+  });
+  const feed = getKnockoutFeed_();
+  Object.keys(feed).forEach(idStr => {
+    const id = Number(idStr);
+    const entry = rowById[id];
+    if (!entry) return;
+    const next = planKnockoutRowUpdate_(entry.row, feed[id], rowById);
+    if (!next) return; // manual lock
+    const current = entry.row.slice(6, 12).map(v => String(v || ''));
+    if (current.every((v, idx) => v === String(next[idx] || ''))) return;
+    mSheet.getRange(entry.sheetRow, 7, 1, 6).setValues([next]);
+    updated++;
+    Logger.log(`syncBracket: #${id} → ${next[1] || 'TBD'} vs ${next[4] || 'TBD'}`);
+  });
+
   if (updated > 0) touchDataVersion();
   Logger.log(`syncBracket: ${updated} matches updated`);
   return updated;
@@ -732,6 +754,63 @@ function planR32RowUpdate_(row, resolved, metaByCode) {
     return meta ? [code, meta.name, meta.flag] : ['', '', ''];
   }
   return side(resolved.home).concat(side(resolved.away));
+}
+
+// Knockout advancement tree (downstream match_id → which upstream match's
+// Winner/Loser fills its home/away slot). Verified against the official FIFA
+// 2026 bracket by venue: R32→R16 feed anchored to the resolved fixtures at
+// each stadium; R16→QF→SF→Final and SF-losers→3rd are the fixed FIFA topology.
+function getKnockoutFeed_() {
+  const W = id => ({ match: id, take: 'W' });
+  const L = id => ({ match: id, take: 'L' });
+  return {
+    89: { home: W(73), away: W(76) },
+    90: { home: W(75), away: W(78) },
+    91: { home: W(74), away: W(77) },
+    92: { home: W(79), away: W(80) },
+    93: { home: W(84), away: W(83) },
+    94: { home: W(82), away: W(81) },
+    95: { home: W(87), away: W(86) },
+    96: { home: W(85), away: W(88) },
+    97: { home: W(89), away: W(90) },
+    98: { home: W(93), away: W(94) },
+    99: { home: W(91), away: W(92) },
+    100: { home: W(95), away: W(96) },
+    101: { home: W(97), away: W(98) },
+    102: { home: W(99), away: W(100) },
+    103: { home: L(101), away: L(102) },
+    104: { home: W(101), away: W(102) }
+  };
+}
+
+// Determine winner/loser team cells [code, name, flag] of a finished knockout
+// match row. Returns null when the match is not finished, scores are missing,
+// either team is still TBD, or the score is level (penalties are not stored,
+// so a draw can't be auto-resolved — leave it for a manual override).
+function knockoutOutcome_(row) {
+  if (!row || String(row[14]) !== 'finished') return null;
+  const s1 = row[12], s2 = row[13];
+  if (s1 === '' || s1 === null || s1 === undefined) return null;
+  if (s2 === '' || s2 === null || s2 === undefined) return null;
+  const home = [String(row[6] || ''), String(row[7] || ''), String(row[8] || '')];
+  const away = [String(row[9] || ''), String(row[10] || ''), String(row[11] || '')];
+  if (!home[0] || !away[0]) return null;
+  const n1 = Number(s1), n2 = Number(s2);
+  if (isNaN(n1) || isNaN(n2) || n1 === n2) return null;
+  return n1 > n2 ? { winner: home, loser: away } : { winner: away, loser: home };
+}
+
+// Plan the six team cells for a downstream knockout row from its feed entry.
+// A manually locked row returns null; an unresolved feeder yields a blank triple.
+function planKnockoutRowUpdate_(row, feed, rowById) {
+  if (row[17] === true) return null;
+  function side(src) {
+    const entry = src && rowById[src.match];
+    const outcome = entry && knockoutOutcome_(entry.row);
+    if (!outcome) return ['', '', ''];
+    return src.take === 'W' ? outcome.winner : outcome.loser;
+  }
+  return side(feed.home).concat(side(feed.away));
 }
 
 // Convert matches Sheet rows into the pure match shape used by FIFA

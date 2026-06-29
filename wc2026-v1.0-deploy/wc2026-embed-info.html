@@ -231,6 +231,27 @@ footer {
     </div>
   </div>
 
+  <!-- ── 射手競賽 ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>🏅 世界盃歷史射手競賽</h2>
+      <span class="tag">wc2026-scorers.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>500px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-scorers">
+        <button class="copy-btn" onclick="copyCode('code-scorers', this)">複製</button>
+        <pre id="pre-scorers"></pre>
+      </div>
+      <p class="note">步階折線圖呈現六位歷代射手（Mbappé、Messi、C. Ronaldo 及退役參考線）；2026 年進球即時更新。</p>
+    </div>
+  </div>
+
   <!-- ── postMessage 說明 ── -->
   <div class="postmsg-note">
     <strong>⚡ 自動高度調整說明</strong><br>
@@ -250,6 +271,7 @@ const CHARTS = [
   { id: 'schedule', file: 'wc2026-schedule.html', title: '世界盃每日賽程',   height: 800 },
   { id: 'groups',   file: 'wc2026-groups.html',   title: '世界盃小組積分',   height: 430 },
   { id: 'bracket',  file: 'wc2026-bracket.html',  title: '世界盃淘汰賽賽程樹', height: 800 },
+  { id: 'scorers',  file: 'wc2026-scorers.html',  title: '世界盃歷史射手競賽', height: 500 },
 ];
 
 function buildCode(baseUrl, chart) {

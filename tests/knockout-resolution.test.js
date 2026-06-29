@@ -189,8 +189,8 @@ for (let id = 73; id <= 88; id++) {
     `match ${id} has exactly two seed codes`);
 }
 assert.strictEqual(seedMap[73].join('|'), '2A|2B', 'match 73 seed codes');
-assert.strictEqual(seedMap[74].join('|'), '1E|3 ABCDF', 'match 74 seed codes');
-assert.strictEqual(seedMap[88].join('|'), '2D|2G', 'match 88 seed codes');
+assert.strictEqual(seedMap[74].join('|'), '1C|2F', 'match 74 seed codes');
+assert.strictEqual(seedMap[88].join('|'), '1K|3 DEIJL', 'match 88 seed codes');
 
 // ── Task 4.3: isGroupStageComplete ───────────────────────────────
 const gate = loadFunctions(gasCode, ['isGroupStageComplete']);
@@ -282,23 +282,24 @@ groups12.forEach(g => {
 const r32 = resolveR32(standings);
 
 // slot→group for combination ABCDEFGH: 1A=H,1B=G,1D=B,1E=C,1G=A,1I=F,1K=D,1L=E
+// Seed→match-id verified against the official FIFA 2026 bracket (by venue).
 const expected = {
   73: { home: 'A2', away: 'B2' },
-  74: { home: 'E1', away: 'C3' }, // 1E vs 3rd (slot 1E → C)
-  75: { home: 'F1', away: 'C2' },
-  76: { home: 'C1', away: 'F2' },
-  77: { home: 'I1', away: 'F3' }, // slot 1I → F
-  78: { home: 'E2', away: 'I2' },
+  74: { home: 'C1', away: 'F2' },
+  75: { home: 'E1', away: 'C3' }, // 1E vs 3rd (slot 1E → C)
+  76: { home: 'F1', away: 'C2' },
+  77: { home: 'E2', away: 'I2' },
+  78: { home: 'I1', away: 'F3' }, // slot 1I → F
   79: { home: 'A1', away: 'H3' }, // slot 1A → H
   80: { home: 'L1', away: 'E3' }, // slot 1L → E
-  81: { home: 'D1', away: 'B3' }, // slot 1D → B
-  82: { home: 'G1', away: 'A3' }, // slot 1G → A
-  83: { home: 'K2', away: 'L2' },
-  84: { home: 'H1', away: 'J2' },
+  81: { home: 'G1', away: 'A3' }, // slot 1G → A
+  82: { home: 'D1', away: 'B3' }, // slot 1D → B
+  83: { home: 'H1', away: 'J2' },
+  84: { home: 'K2', away: 'L2' },
   85: { home: 'B1', away: 'G3' }, // slot 1B → G
-  86: { home: 'J1', away: 'H2' },
-  87: { home: 'K1', away: 'D3' }, // slot 1K → D
-  88: { home: 'D2', away: 'G2' }
+  86: { home: 'D2', away: 'G2' },
+  87: { home: 'J1', away: 'H2' },
+  88: { home: 'K1', away: 'D3' } // slot 1K → D
 };
 
 for (let id = 73; id <= 88; id++) {
@@ -310,7 +311,7 @@ for (let id = 73; id <= 88; id++) {
 const partial = standings.filter(t => t.code.endsWith('1') || t.code.endsWith('2'));
 const r32partial = resolveR32(partial);
 assert.strictEqual(r32partial[73].home, null, 'incomplete group data does not resolve a rank');
-assert.strictEqual(r32partial[74].away, null, 'third slot is null when thirds unavailable');
+assert.strictEqual(r32partial[80].away, null, 'third slot is null when thirds unavailable');
 
 // Progressive resolution: group A winner is uncatchable after two matches,
 // but runner-up remains uncertain. Other groups are also still undecided.
@@ -327,7 +328,7 @@ groups12.forEach(g => {
 const progressiveR32 = resolveR32(progressiveStandings);
 assert.strictEqual(progressiveR32[79].home, 'A1', 'clinched 1A resolves before all groups finish');
 assert.strictEqual(progressiveR32[73].home, null, 'uncertain 2A remains unresolved');
-assert.strictEqual(progressiveR32[74].away, null, 'third-place slots remain unresolved during group play');
+assert.strictEqual(progressiveR32[80].away, null, 'third-place slots remain unresolved during group play');
 
 const googleAlignedR32 = resolveR32(currentGroupA, currentGroupAMatches);
 assert.strictEqual(googleAlignedR32[79].home, 'MEX', 'current Group A resolves Mexico into the 1A bracket slot');

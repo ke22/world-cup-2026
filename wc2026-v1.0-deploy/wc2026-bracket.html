@@ -739,14 +739,14 @@ const GROUPS_INFO = {
 
 /* ── R32 seeding (WC 2026 official bracket) ─── */
 const R32_SEEDS = {
-  73: ['2A','2B'],      74: ['1E','3 ABCDF'],
-  75: ['1F','2C'],      76: ['1C','2F'],
-  77: ['1I','3 CDFGH'], 78: ['2E','2I'],
+  73: ['2A','2B'],      74: ['1C','2F'],
+  75: ['1E','3 ABCDF'], 76: ['1F','2C'],
+  77: ['2E','2I'],      78: ['1I','3 CDFGH'],
   79: ['1A','3 CEFHI'], 80: ['1L','3 EHIJK'],
-  81: ['1D','3 BEFIJ'], 82: ['1G','3 AEHIJ'],
-  83: ['2K','2L'],      84: ['1H','2J'],
-  85: ['1B','3 EFGIJ'], 86: ['1J','2H'],
-  87: ['1K','3 DEIJL'], 88: ['2D','2G'],
+  81: ['1G','3 AEHIJ'], 82: ['1D','3 BEFIJ'],
+  83: ['1H','2J'],      84: ['2K','2L'],
+  85: ['1B','3 EFGIJ'], 86: ['2D','2G'],
+  87: ['1J','2H'],      88: ['1K','3 DEIJL'],
 };
 
 /* Convert raw seed code to readable Chinese label */
@@ -895,9 +895,22 @@ function renderDesktop(matches) {
   const bp = {};
   matches.forEach(m => { (bp[m.phase] ??= []).push(m); });
 
-  const r32=bp[PHASE_R32]||[], r16=bp[PHASE_R16]||[];
-  const qf=bp[PHASE_QF]||[],   sf=bp[PHASE_SF]||[];
+  const r32raw=bp[PHASE_R32]||[], r16=bp[PHASE_R16]||[];
+  const qf=bp[PHASE_QF]||[],     sf=bp[PHASE_SF]||[];
   const fin=(bp[PHASE_F]||[])[0], t3=(bp[PHASE_3RD]||[])[0];
+
+  // Correct bracket order: each R32 pair must sit next to the R16 match it feeds.
+  // Halves follow the QF/SF tree: left = R16 {89,90,93,94} (→QF97/98→SF101),
+  // right = R16 {91,92,95,96} (→QF99/100→SF102), matching Code.gs
+  // R16_BRACKET_ORDER = [89,90,94,93, 91,92,96,95].
+  // Left  rows align to R16 [89,90,94,93]: (73,76)→89, (75,78)→90, (81,82)→94, (83,84)→93
+  // Right rows align to R16 [91,92,96,95]: (74,77)→91, (79,80)→92, (85,88)→96, (86,87)→95
+  const R32_ORDER = [73,76,75,78,81,82,83,84, 74,77,79,80,85,88,86,87];
+  const r32ById = Object.fromEntries(r32raw.map(m => [m.match_id, m]));
+  const r32 = [
+    ...R32_ORDER.map(id => r32ById[id]).filter(Boolean),
+    ...r32raw.filter(m => !R32_ORDER.includes(m.match_id)),
+  ];
 
   const r32L=r32.slice(0,8), r32R=r32.slice(8,16);
   const r16L=r16.slice(0,4), r16R=r16.slice(4,8);
@@ -1316,7 +1329,28 @@ async function init() {
   requestAnimationFrame(fitBracket);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+let _bracketRefreshInFlight = false;
+let _bracketRefreshTimer = null;
+
+async function refreshBracket() {
+  if (_bracketRefreshInFlight) return;
+  _bracketRefreshInFlight = true;
+  try {
+    await init();
+  } finally {
+    _bracketRefreshInFlight = false;
+  }
+}
+
+function startBracketAutoRefresh() {
+  if (_bracketRefreshTimer) clearInterval(_bracketRefreshTimer);
+  _bracketRefreshTimer = setInterval(refreshBracket, 60 * 1000);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await refreshBracket();
+  startBracketAutoRefresh();
+});
 
 window.addEventListener('storage', e => {
   if (e.key !== 'wc26_refresh_token') return;

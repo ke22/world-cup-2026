@@ -26,23 +26,25 @@ const R32_TEAMS = [
   ['QAT', '卡達', '🇶🇦'], ['CRO', '克羅埃西亞', '🇭🇷'],
 ];
 
+// Verified against the official FIFA 2026 bracket by venue (each match-id's
+// resolved teams match the official R32 fixture at that stadium).
 const EXPECTED_R32_SEEDS = {
   73: ['2A', '2B'],
-  74: ['1E', '3 ABCDF'],
-  75: ['1F', '2C'],
-  76: ['1C', '2F'],
-  77: ['1I', '3 CDFGH'],
-  78: ['2E', '2I'],
+  74: ['1C', '2F'],
+  75: ['1E', '3 ABCDF'],
+  76: ['1F', '2C'],
+  77: ['2E', '2I'],
+  78: ['1I', '3 CDFGH'],
   79: ['1A', '3 CEFHI'],
   80: ['1L', '3 EHIJK'],
-  81: ['1D', '3 BEFIJ'],
-  82: ['1G', '3 AEHIJ'],
-  83: ['2K', '2L'],
-  84: ['1H', '2J'],
+  81: ['1G', '3 AEHIJ'],
+  82: ['1D', '3 BEFIJ'],
+  83: ['1H', '2J'],
+  84: ['2K', '2L'],
   85: ['1B', '3 EFGIJ'],
-  86: ['1J', '2H'],
-  87: ['1K', '3 DEIJL'],
-  88: ['2D', '2G'],
+  86: ['2D', '2G'],
+  87: ['1J', '2H'],
+  88: ['1K', '3 DEIJL'],
 };
 
 const EXPECTED_GROUP_TEAMS = {
