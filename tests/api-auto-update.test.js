@@ -48,23 +48,39 @@ function testScheduleTodayUsesTaiwanDate(source, label) {
 testScheduleTodayUsesTaiwanDate(scheduleHtml, 'root schedule');
 testScheduleTodayUsesTaiwanDate(deployScheduleHtml, 'deploy schedule');
 
+// Score auto-sync now pulls from the ESPN scoreboard API. Verify the pure
+// helpers that map ESPN status / abbreviations / dates onto our match model.
 const gasHelpers = loadFunctions(gasCode, [
-  'footballDataStatusToMatchStatus_',
-  'getFootballDataFullTimeScore_',
-  'shouldSyncFootballDataMatch_'
+  'espnStatusToMatchStatus_',
+  'utcToDate8'
 ]);
-const toMatchStatus = gasHelpers.footballDataStatusToMatchStatus_;
-assert.strictEqual(toMatchStatus('FINISHED'), 'finished');
-assert.strictEqual(toMatchStatus('IN_PLAY'), 'live');
-assert.strictEqual(toMatchStatus('PAUSED'), 'live');
-assert.strictEqual(toMatchStatus('LIVE'), 'live');
-assert.strictEqual(toMatchStatus('TIMED'), 'upcoming');
-assert.strictEqual(toMatchStatus('SCHEDULED'), 'upcoming');
 
-const shouldSync = gasHelpers.shouldSyncFootballDataMatch_;
-assert.strictEqual(shouldSync({ status: 'IN_PLAY', score: { fullTime: { home: null, away: null } } }), true);
-assert.strictEqual(shouldSync({ status: 'PAUSED', score: { fullTime: { home: null, away: null } } }), true);
-assert.strictEqual(shouldSync({ status: 'FINISHED', score: { fullTime: { home: 2, away: 1 } } }), true);
-assert.strictEqual(shouldSync({ status: 'TIMED', score: { fullTime: { home: null, away: null } } }), false);
+// espnCode_ depends on the top-level ESPN_CODE_MAP const, so load it too.
+const espnCtx = {};
+vm.createContext(espnCtx);
+const mapStart = gasCode.indexOf('const ESPN_CODE_MAP');
+const mapDef = gasCode.slice(mapStart, gasCode.indexOf('};', mapStart) + 2);
+vm.runInContext(`${mapDef}\n${extractFunction(gasCode, 'espnCode_')}\nthis.espnCode_ = espnCode_;`, espnCtx);
+gasHelpers.espnCode_ = espnCtx.espnCode_;
+
+const toMatchStatus = gasHelpers.espnStatusToMatchStatus_;
+assert.strictEqual(toMatchStatus('STATUS_FULL_TIME'), 'finished');
+assert.strictEqual(toMatchStatus('STATUS_FINAL'), 'finished');
+assert.strictEqual(toMatchStatus('STATUS_IN_PROGRESS'), 'live');
+assert.strictEqual(toMatchStatus('STATUS_HALFTIME'), 'live');
+assert.strictEqual(toMatchStatus('IN_PLAY'), 'live');      // matches the "PLAY" substring rule
+assert.strictEqual(toMatchStatus('STATUS_SCHEDULED'), 'upcoming');
+assert.strictEqual(toMatchStatus(''), 'upcoming');
+assert.strictEqual(toMatchStatus(null), 'upcoming');
+
+const espnCode = gasHelpers.espnCode_;
+assert.strictEqual(espnCode('BOC'), 'BIH', 'mapped ESPN abbreviation → internal code');
+assert.strictEqual(espnCode('DRC'), 'CGO', 'DR Congo maps to CGO');
+assert.strictEqual(espnCode('SAU'), 'KSA', 'Saudi Arabia maps to KSA');
+assert.strictEqual(espnCode('BRA'), 'BRA', 'unmapped abbreviation passes through unchanged');
+
+const utcToDate8 = gasHelpers.utcToDate8;
+assert.strictEqual(utcToDate8('2026-06-11T18:00:00Z'), '2026-06-12', 'UTC+8 rolls 18:00Z to next day');
+assert.strictEqual(utcToDate8('2026-06-12T03:00:00Z'), '2026-06-12', 'morning UTC stays same UTC+8 day');
 
 console.log('api-auto-update tests passed');
