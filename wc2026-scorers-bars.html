@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>2026 世界盃射手榜</title>
+<style>
+/* ── CNA Design System Variables ── */
+:root {
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --fg: #1f2937;
+  --muted: #66758a;
+  --border: rgba(15, 50, 96, 0.12);
+  --shadow: rgba(15, 75, 143, 0.08);
+  --accent: #0f4b8f;
+  --accent-2: #2c73c9;
+  --header-from: #13579f;
+  --header-to: #0f4b8f;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.wrapper { max-width: 800px; margin: 0 auto; padding: 10px; }
+
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px var(--shadow);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, var(--header-from) 0%, var(--header-to) 100%);
+  border-radius: 16px 16px 0 0;
+  gap: 12px;
+}
+.cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+.header-title { font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: 0.2px; }
+
+/* ── Legend ── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 12px 18px 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend-swatch { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Chart ── */
+.chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 6px 8px 8px; }
+.chart-scroll svg { display: block; min-width: 600px; height: auto; }
+
+/* ── Note ── */
+.note-row {
+  padding: 6px 18px 14px;
+  font-size: 11.5px; color: #94a3b8; line-height: 1.55;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Hover tooltip ── */
+#tt {
+  position: fixed;
+  pointer-events: none;
+  z-index: 200;
+  display: none;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 13px;
+  min-width: 120px;
+  box-shadow: 0 6px 24px rgba(15, 50, 96, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.tt-name  { font-size: 13.5px; font-weight: 700; color: #1f2937; }
+.tt-year  { font-size: 11.5px; color: #64748b; margin-top: 2px; }
+.tt-goals { font-size: 13px; font-variant-numeric: tabular-nums; color: #2c73c9; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="panel">
+    <div class="header">
+      <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+      <span class="header-title">2026 世界盃射手榜・生涯進球</span>
+    </div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="chart-scroll">
+      <svg id="chart" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="note-row">
+      僅列 2026 世界盃參賽球員，長條長度為其世界盃生涯總進球，依屆別分段；2026 進球以即時資料為準。資料來源：FIFA / OPTA。
+    </div>
+  </div>
+</div>
+
+<div id="tt">
+  <div class="tt-name"></div>
+  <div class="tt-year"></div>
+  <div class="tt-goals"></div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+const CACHE_KEY = 'wc26_scorers';
+const CACHE_TTL = 60; // seconds
+
+// ── 11 players who participate in the 2026 World Cup ──
+// career omits non-participation years; 2026 goals are static fallbacks that the
+// live GAS getTopScorers feed overrides when a player_code matches (see ALIASES).
+// Source: FIFA / OPTA.
+const PLAYERS = {
+  messi:    { name: '梅西',      flag: '🇦🇷', country: 'ARG', color: '#1565C0', career: [
+    { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 5 },
+  ]},
+  mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
+    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
+  ]},
+  cronaldo: { name: 'C羅納度',   flag: '🇵🇹', country: 'POR', color: '#2E7D32', career: [
+    { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 2 },
+  ]},
+  kane:     { name: '凱恩',      flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', country: 'ENG', color: '#7B1FA2', career: [
+    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 2 },
+  ]},
+  neymar:   { name: '內馬爾',    flag: '🇧🇷', country: 'BRA', color: '#FB8C00', career: [
+    { wc: 2014, goals: 4 }, { wc: 2018, goals: 2 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 0 },
+  ]},
+  valencia: { name: '瓦倫西亞',  flag: '🇪🇨', country: 'ECU', color: '#AD1457', career: [
+    { wc: 2014, goals: 3 }, { wc: 2022, goals: 3 }, { wc: 2026, goals: 0 },
+  ]},
+  james:    { name: '羅德里格斯', flag: '🇨🇴', country: 'COL', color: '#6D4C41', career: [
+    { wc: 2014, goals: 6 }, { wc: 2018, goals: 0 }, { wc: 2026, goals: 0 },
+  ]},
+  lukaku:   { name: '盧卡庫',    flag: '🇧🇪', country: 'BEL', color: '#EC407A', career: [
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 0 }, { wc: 2026, goals: 1 },
+  ]},
+  perisic:  { name: '柏瑞斯奇',  flag: '🇭🇷', country: 'CRO', color: '#3949AB', career: [
+    { wc: 2014, goals: 2 }, { wc: 2018, goals: 3 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 0 },
+  ]},
+  gakpo:    { name: '哈克波',    flag: '🇳🇱', country: 'NED', color: '#00897B', career: [
+    { wc: 2022, goals: 3 }, { wc: 2026, goals: 3 },
+  ]},
+  vinicius: { name: '維尼修斯',  flag: '🇧🇷', country: 'BRA', color: '#00BCD4', career: [
+    { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
+  ]},
+};
+
+// ── GAS player_code → internal key aliases ──
+// The live merge only fires when the feed's player_code resolves to one of the
+// PLAYERS keys above. Most internal keys already match the likely feed codes
+// directly (neymar, lukaku, gakpo, vinicius, valencia, perisic). Only codes that
+// differ need an entry here. Players whose feed code we cannot confirm fall back
+// to their static 2026 value above (no error).
+const ALIASES = {
+  'ronaldo': 'cronaldo',          // feed uses 'ronaldo' for C. Ronaldo
+  'james_rodriguez': 'james',     // assumed; falls back to static if unmatched
+  'james': 'james',
+  'enner_valencia': 'valencia',   // assumed; falls back to static if unmatched
+};
+
+// ── Tournament segment buckets (older → newer; 2026 darkest to emphasise live) ──
+const SEGMENTS = [
+  { key: 'pre',  label: '2014前', color: '#cbd5e1' },
+  { key: '2014', label: '2014',   color: '#93c5fd' },
+  { key: '2018', label: '2018',   color: '#60a5fa' },
+  { key: '2022', label: '2022',   color: '#3b82f6' },
+  { key: '2026', label: '2026',   color: '#1d4ed8' },
+];
+
+// ── sessionStorage cache ──
+function cacheGet(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts < CACHE_TTL * 1000) return data;
+    sessionStorage.removeItem(key);
+    return null;
+  } catch { return null; }
+}
+function cacheSet(key, data) {
+  try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+// ── Fetch live 2026 data ──
+async function fetchTopScorers() {
+  const hit = cacheGet(CACHE_KEY);
+  if (hit) return hit;
+  const url = GAS_URL + '?action=getTopScorers';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.status !== 'ok') throw new Error(json.message || 'API error');
+  cacheSet(CACHE_KEY, json.data);
+  return json.data;
+}
+
+// ── Merge live 2026 goals into a deep copy of PLAYERS ──
+function mergePlayerData(base, live2026) {
+  const merged = {};
+  for (const [code, p] of Object.entries(base)) {
+    merged[code] = { ...p, career: p.career.map(t => ({ ...t })) };
+  }
+  for (const lp of live2026) {
+    const code = ALIASES[lp.player_code] || lp.player_code;
+    if (!merged[code]) continue;
+    if (lp.matches_played_2026 > 0) {
+      const entry = { wc: 2026, goals: lp.total_goals_2026 };
+      const idx = merged[code].career.findIndex(t => t.wc === 2026);
+      if (idx >= 0) merged[code].career[idx] = entry;
+      else merged[code].career.push(entry);
+    }
+  }
+  return merged;
+}
+
+// ── Derived helpers ──
+function bucketize(career) {
+  const b = { pre: 0, 2014: 0, 2018: 0, 2022: 0, 2026: 0 };
+  for (const t of career) {
+    if (t.wc < 2014) b.pre += t.goals;
+    else b[t.wc] += t.goals;
+  }
+  return b;
+}
+const totalOf = career => career.reduce((s, t) => s + t.goals, 0);
+
+// ── SVG helpers ──
+const NS = 'http://www.w3.org/2000/svg';
+function mk(tag, attrs, parent) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  parent && parent.appendChild(el);
+  return el;
+}
+function txt(str, attrs, parent) {
+  const el = mk('text', attrs, parent);
+  el.textContent = str;
+  return el;
+}
+const f = n => (Math.round(n * 100) / 100);
+
+// ── Flag helpers (twemoji SVG from local emoji/ folder) ──
+function emojiToCodePoint(emoji) {
+  const pts = [];
+  for (const ch of emoji) {
+    const cp = ch.codePointAt(0).toString(16);
+    if (cp !== 'fe0f') pts.push(cp);
+  }
+  return pts.join('-');
+}
+function flagHref(emoji) { return `emoji/${emojiToCodePoint(emoji)}.svg`; }
+
+// ── Tooltip ──
+const tt     = document.getElementById('tt');
+const ttName = tt.querySelector('.tt-name');
+const ttYear = tt.querySelector('.tt-year');
+const ttGoal = tt.querySelector('.tt-goals');
+function ttShow(e, name, color, yearLabel, goals, total) {
+  ttName.textContent = name;
+  ttName.style.color = color;
+  ttYear.textContent = yearLabel;
+  ttGoal.textContent = `本段 ${goals} 球・生涯 ${total} 球`;
+  tt.style.display = 'block';
+  ttMove(e);
+}
+function ttMove(e) {
+  const src = e.touches ? e.touches[0] : e;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = tt.offsetWidth || 160, h = tt.offsetHeight || 70;
+  let left = src.clientX + 16, top = src.clientY - 12;
+  if (left + w > vw - 8) left = src.clientX - w - 16;
+  if (top + h > vh - 8)  top  = src.clientY - h + 12;
+  tt.style.left = left + 'px';
+  tt.style.top  = top  + 'px';
+}
+function ttHide() { tt.style.display = 'none'; }
+
+// ── Geometry ──
+const VW = 720;
+const BX = 168;          // bar start x (left of it = flag + name)
+const RIGHT_PAD = 44;    // room for the total label
+const BARW = VW - BX - RIGHT_PAD;
+const ROW_H = 26, ROW_GAP = 8, ROW_STEP = ROW_H + ROW_GAP;
+const TOP = 14, BOTTOM = 14;
+
+// ── Legend ──
+function renderLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  for (const s of SEGMENTS) {
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+    const sw = document.createElement('span');
+    sw.className = 'legend-swatch';
+    sw.style.background = s.color;
+    const lab = document.createElement('span');
+    lab.textContent = s.label;
+    item.append(sw, lab);
+    el.appendChild(item);
+  }
+}
+
+// ── Render ──
+function render(playerData) {
+  renderLegend();
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+
+  // Build rows, sort by total desc (tie-break: 2026 goals, then 2022 goals)
+  const rows = Object.values(playerData).map(p => {
+    const b = bucketize(p.career);
+    return { ...p, buckets: b, total: totalOf(p.career) };
+  });
+  rows.sort((a, b) =>
+    b.total - a.total ||
+    b.buckets[2026] - a.buckets[2026] ||
+    b.buckets[2022] - a.buckets[2022]
+  );
+
+  const maxTotal = Math.max(...rows.map(r => r.total));
+  const scale = BARW / maxTotal;
+
+  const VH = TOP + rows.length * ROW_STEP + BOTTOM;
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+
+  mk('rect', { x: 0, y: 0, width: VW, height: VH, fill: '#fff' }, svg);
+
+  rows.forEach((r, i) => {
+    const y = TOP + i * ROW_STEP;
+    const cy = y + ROW_H / 2;
+
+    // ── left: flag + name ──
+    const flagH = 16;
+    mk('image', {
+      href: flagHref(r.flag), x: 10, y: f(cy - flagH * 0.62),
+      width: flagH, height: flagH,
+    }, svg);
+    txt(r.name, {
+      x: 32, y: f(cy + 4.5),
+      'text-anchor': 'start', fill: 'var(--fg)', 'font-size': '13', 'font-weight': '600',
+    }, svg);
+
+    // ── stacked segments ──
+    let cursor = BX;
+    for (const seg of SEGMENTS) {
+      const g = r.buckets[seg.key];
+      if (g <= 0) continue;
+      const w = g * scale;
+      const rect = mk('rect', {
+        x: f(cursor), y: f(y), width: f(w), height: ROW_H,
+        fill: seg.color, stroke: '#fff', 'stroke-width': 1,
+        rx: 1, style: 'cursor:pointer',
+      }, svg);
+      const yearLabel = seg.key === 'pre' ? '2014 前' : `${seg.key} 世界盃`;
+      rect.addEventListener('mouseenter', e => ttShow(e, r.name, r.color, yearLabel, g, r.total));
+      rect.addEventListener('mousemove',  ttMove);
+      rect.addEventListener('mouseleave', ttHide);
+      rect.addEventListener('touchstart', e => { e.preventDefault(); ttShow(e, r.name, r.color, yearLabel, g, r.total); }, { passive: false });
+      rect.addEventListener('touchend',   ttHide);
+      // segment goal count, only when wide enough to fit
+      if (w >= 16) {
+        txt(String(g), {
+          x: f(cursor + w / 2), y: f(cy + 4),
+          'text-anchor': 'middle', fill: '#fff', 'font-size': '11',
+          'font-weight': '600', 'font-variant-numeric': 'tabular-nums',
+          'pointer-events': 'none',
+        }, svg);
+      }
+      cursor += w;
+    }
+
+    // ── total label at bar end ──
+    txt(String(r.total), {
+      x: f(cursor + 8), y: f(cy + 4.5),
+      'text-anchor': 'start', fill: r.color, 'font-size': '13.5',
+      'font-weight': '700', 'font-variant-numeric': 'tabular-nums',
+    }, svg);
+  });
+}
+
+// ── Main ──
+async function main() {
+  let playerData = PLAYERS;
+  try {
+    const live2026 = await fetchTopScorers();
+    playerData = mergePlayerData(PLAYERS, live2026);
+  } catch (e) {
+    // GAS unavailable — fall back to static data silently
+  }
+  render(playerData);
+  window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
+}
+
+main();
+</script>
+</body>
+</html>

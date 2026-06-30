@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>2026 世界盃射手競賽</title>
+<style>
+/* ── CNA Design System Variables ── */
+:root {
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --fg: #1f2937;
+  --muted: #66758a;
+  --border: rgba(15, 50, 96, 0.12);
+  --shadow: rgba(15, 75, 143, 0.08);
+  --accent: #0f4b8f;
+  --accent-2: #2c73c9;
+  --header-from: #13579f;
+  --header-to: #0f4b8f;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.wrapper { max-width: 800px; margin: 0 auto; padding: 10px; }
+
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px var(--shadow);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, var(--header-from) 0%, var(--header-to) 100%);
+  border-radius: 16px 16px 0 0;
+  gap: 12px;
+}
+.cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+.header-title { font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: 0.2px; }
+
+/* ── Chart ── */
+.chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 16px 8px 4px; }
+.chart-scroll svg { display: block; min-width: 600px; height: auto; }
+
+/* ── Note ── */
+.note-row {
+  padding: 6px 18px 14px;
+  font-size: 11.5px; color: #94a3b8; line-height: 1.55;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Hover tooltip ── */
+#tt {
+  position: fixed;
+  pointer-events: none;
+  z-index: 200;
+  display: none;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 130px;
+  box-shadow: 0 6px 24px rgba(15, 50, 96, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.tt-name  { font-size: 13.5px; font-weight: 700; color: #1f2937; }
+.tt-year  { font-size: 11.5px; color: #64748b; margin-top: 2px; }
+.tt-goals { font-size: 13px; font-variant-numeric: tabular-nums; color: #2c73c9; margin-top: 5px; }
+.tt-sep   { width: 100%; height: 1px; background: rgba(15, 50, 96, 0.12); margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="panel">
+    <div class="header">
+      <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+      <span class="header-title">2026 世界盃射手競賽・累計進球</span>
+    </div>
+
+    <div class="chart-scroll">
+      <svg id="chart" viewBox="0 0 720 440" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="note-row">
+      僅列 2026 世界盃參賽球員；線條為其歷屆世界盃累計進球，點選或滑過任一球員可聚焦該人。2026 進球以即時資料為準。資料來源：FIFA / OPTA。
+    </div>
+  </div>
+</div>
+
+<div id="tt">
+  <div class="tt-name"></div>
+  <div class="tt-year"></div>
+  <div class="tt-sep"></div>
+  <div class="tt-goals"></div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+const CACHE_KEY = 'wc26_scorers';
+const CACHE_TTL = 60; // seconds
+
+// ── 11 players who participate in the 2026 World Cup ──
+// career omits non-participation years; 2026 goals are static fallbacks that the
+// live GAS getTopScorers feed overrides when a player_code matches (see ALIASES).
+// Source: FIFA / OPTA.
+const PLAYERS = {
+  messi:    { name: '梅西',      flag: '🇦🇷', country: 'ARG', color: '#1565C0', career: [
+    { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 5 },
+  ]},
+  mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
+    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
+  ]},
+  cronaldo: { name: 'C羅納度',   flag: '🇵🇹', country: 'POR', color: '#2E7D32', career: [
+    { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 2 },
+  ]},
+  kane:     { name: '凱恩',      flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', country: 'ENG', color: '#7B1FA2', career: [
+    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 2 },
+  ]},
+  neymar:   { name: '內馬爾',    flag: '🇧🇷', country: 'BRA', color: '#FB8C00', career: [
+    { wc: 2014, goals: 4 }, { wc: 2018, goals: 2 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 0 },
+  ]},
+  valencia: { name: '瓦倫西亞',  flag: '🇪🇨', country: 'ECU', color: '#AD1457', career: [
+    { wc: 2014, goals: 3 }, { wc: 2022, goals: 3 }, { wc: 2026, goals: 0 },
+  ]},
+  james:    { name: '羅德里格斯', flag: '🇨🇴', country: 'COL', color: '#6D4C41', career: [
+    { wc: 2014, goals: 6 }, { wc: 2018, goals: 0 }, { wc: 2026, goals: 0 },
+  ]},
+  lukaku:   { name: '盧卡庫',    flag: '🇧🇪', country: 'BEL', color: '#EC407A', career: [
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 0 }, { wc: 2026, goals: 1 },
+  ]},
+  perisic:  { name: '柏瑞斯奇',  flag: '🇭🇷', country: 'CRO', color: '#3949AB', career: [
+    { wc: 2014, goals: 2 }, { wc: 2018, goals: 3 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 0 },
+  ]},
+  gakpo:    { name: '哈克波',    flag: '🇳🇱', country: 'NED', color: '#00897B', career: [
+    { wc: 2022, goals: 3 }, { wc: 2026, goals: 3 },
+  ]},
+  vinicius: { name: '維尼修斯',  flag: '🇧🇷', country: 'BRA', color: '#00BCD4', career: [
+    { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
+  ]},
+};
+
+// ── GAS player_code → internal key aliases ──
+// The live merge only fires when the feed's player_code resolves to one of the
+// PLAYERS keys above. Most internal keys already match the likely feed codes
+// directly (neymar, lukaku, gakpo, vinicius, valencia, perisic). Only codes that
+// differ need an entry here. Players whose feed code we cannot confirm fall back
+// to their static 2026 value above (no error).
+const ALIASES = {
+  'ronaldo': 'cronaldo',          // feed uses 'ronaldo' for C. Ronaldo
+  'james_rodriguez': 'james',     // assumed; falls back to static if unmatched
+  'james': 'james',
+  'enner_valencia': 'valencia',   // assumed; falls back to static if unmatched
+};
+
+// ── sessionStorage cache ──
+function cacheGet(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts < CACHE_TTL * 1000) return data;
+    sessionStorage.removeItem(key);
+    return null;
+  } catch { return null; }
+}
+function cacheSet(key, data) {
+  try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+// ── Fetch live 2026 data ──
+async function fetchTopScorers() {
+  const hit = cacheGet(CACHE_KEY);
+  if (hit) return hit;
+  const url = GAS_URL + '?action=getTopScorers';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.status !== 'ok') throw new Error(json.message || 'API error');
+  cacheSet(CACHE_KEY, json.data);
+  return json.data;
+}
+
+// ── Merge live 2026 goals into a deep copy of PLAYERS ──
+function mergePlayerData(base, live2026) {
+  const merged = {};
+  for (const [code, p] of Object.entries(base)) {
+    merged[code] = { ...p, career: p.career.map(t => ({ ...t })) };
+  }
+  for (const lp of live2026) {
+    const code = ALIASES[lp.player_code] || lp.player_code;
+    if (!merged[code]) continue;
+    if (lp.matches_played_2026 > 0) {
+      const entry = { wc: 2026, goals: lp.total_goals_2026 };
+      const idx = merged[code].career.findIndex(t => t.wc === 2026);
+      if (idx >= 0) merged[code].career[idx] = entry;
+      else merged[code].career.push(entry);
+    }
+  }
+  return merged;
+}
+
+// ── Chart geometry ──
+const VW = 720, VH = 440;
+const ML = 48, MT = 28, MR = 110, MB = 52;
+const PW = VW - ML - MR;
+const PH = VH - MT - MB;
+const MAX_Y = 20;
+
+// WC years spanned by the 2026 cohort (earliest goals: Messi / C. Ronaldo 2006)
+const WC_YEARS = [2006, 2010, 2014, 2018, 2022, 2026];
+function cx_year(year) {
+  const i = WC_YEARS.indexOf(year);
+  return ML + (i / (WC_YEARS.length - 1)) * PW;
+}
+const cy = g => MT + PH - (g / MAX_Y) * PH;
+const f  = n => n.toFixed(1);
+
+// ── Build career path (step chart, year-based x-axis) ──
+function buildCareerPath(player) {
+  let y = 0;
+  const pts  = [];
+  const dots = [];
+  const tours = player.career;
+
+  const firstScoringIdx = tours.findIndex(t => t.goals > 0);
+  if (firstScoringIdx < 0) return { pts: [], dots: [], endWC: tours[tours.length - 1].wc, endY: 0 };
+
+  for (let ti = firstScoringIdx; ti < tours.length; ti++) {
+    const tour   = tours[ti];
+    const isLast = ti === tours.length - 1;
+    const goals  = tour.goals;
+
+    if (ti > firstScoringIdx) pts.push([tour.wc, y]);
+    if (goals > 0) { y += goals; pts.push([tour.wc, y]); }
+
+    const nextWC = isLast ? null : tours[ti + 1].wc;
+    dots.push({ wx: tour.wc, nextWx: nextWC, isMid: !isLast,
+                year: tour.wc, cumGoals: y, tourGoals: goals, isCareerStart: false });
+  }
+
+  return { pts, dots, endWC: tours[tours.length - 1].wc, endY: y };
+}
+
+// ── Tooltip ──
+const tt     = document.getElementById('tt');
+const ttName = tt.querySelector('.tt-name');
+const ttYear = tt.querySelector('.tt-year');
+const ttGoal = tt.querySelector('.tt-goals');
+
+function ttShow(e, dot, playerName, playerColor) {
+  ttName.textContent = playerName;
+  ttName.style.color = playerColor;
+  ttYear.textContent = `${dot.year} 世界盃`;
+  ttGoal.textContent = `本屆 ${dot.tourGoals} 球・累計 ${dot.cumGoals} 球`;
+  tt.style.display = 'block';
+  ttMove(e);
+}
+function ttMove(e) {
+  const src = e.touches ? e.touches[0] : e;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = tt.offsetWidth || 170, h = tt.offsetHeight || 80;
+  let left = src.clientX + 16, top = src.clientY - 12;
+  if (left + w > vw - 8) left = src.clientX - w - 16;
+  if (top + h > vh - 8)  top  = src.clientY - h + 12;
+  tt.style.left = left + 'px';
+  tt.style.top  = top  + 'px';
+}
+function ttHide() { tt.style.display = 'none'; }
+
+// ── SVG helpers ──
+const NS = 'http://www.w3.org/2000/svg';
+function mk(tag, attrs, parent) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  parent && parent.appendChild(el);
+  return el;
+}
+function txt(str, attrs, parent) {
+  const el = mk('text', attrs, parent);
+  el.textContent = str;
+  return el;
+}
+
+// ── Flag helpers (twemoji SVG from local emoji/ folder) ──
+function emojiToCodePoint(emoji) {
+  const pts = [];
+  for (const ch of emoji) {
+    const cp = ch.codePointAt(0).toString(16);
+    if (cp !== 'fe0f') pts.push(cp);
+  }
+  return pts.join('-');
+}
+function flagHref(emoji) { return `emoji/${emojiToCodePoint(emoji)}.svg`; }
+
+function estTextWidth(str, fs) {
+  let w = 0;
+  for (const ch of str) w += (ch.codePointAt(0) > 0x2e80 ? fs : fs * 0.55);
+  return w;
+}
+
+function drawLabel(parent, x, y, anchor, flagEmoji, label, textAttrs) {
+  const fs   = parseFloat(textAttrs['font-size']) || 12;
+  const flagW = fs * 1.3, flagH = fs * 1.3, gap = fs * 0.35;
+  const textW = estTextWidth(label, fs);
+  const total = flagW + gap + textW;
+  const startX = anchor === 'middle' ? x - total / 2 : x;
+  mk('image', {
+    href: flagHref(flagEmoji), x: f(startX), y: f(y - flagH * 0.82),
+    width: f(flagW), height: f(flagH),
+  }, parent);
+  txt(label, { ...textAttrs, x: f(startX + flagW + gap), y: f(y), 'text-anchor': 'start' }, parent);
+}
+
+// ── Render ──
+function render(playerData) {
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+
+  mk('rect', { x:0, y:0, width:VW, height:VH, fill:'#fff' }, svg);
+  mk('rect', { x:ML, y:MT, width:PW, height:PH, fill:'rgba(240,244,249,0.45)', rx:2 }, svg);
+
+  // ── Y-axis grid ──
+  // The x-axis baseline (g=0) extends past the plot edge to under the 2026
+  // label (which is offset a half-step right like every year label).
+  const lastY = WC_YEARS[WC_YEARS.length - 1];
+  const prevY = WC_YEARS[WC_YEARS.length - 2];
+  const axisRight = cx_year(lastY) + (cx_year(lastY) - cx_year(prevY)) / 2;
+  const gridG = mk('g', {}, svg);
+  for (let g = 0; g <= 20; g += 2) {
+    const y = cy(g);
+    mk('line', {
+      x1: ML, y1: f(y), x2: g === 0 ? f(axisRight) : ML+PW, y2: f(y),
+      stroke: g === 0 ? 'rgba(15,50,96,0.2)' : 'rgba(15,50,96,0.06)',
+      'stroke-width': g === 0 ? 1.2 : 0.7,
+    }, gridG);
+    if (g > 0 && g % 2 === 0) {
+      txt(String(g), {
+        x: ML - 6, y: f(y + 4),
+        'text-anchor': 'end', fill: '#94a3b8', 'font-size': '10.5',
+        'font-variant-numeric': 'tabular-nums',
+      }, gridG);
+    }
+  }
+  mk('line', { x1:ML, y1:MT, x2:ML, y2:MT+PH, stroke:'rgba(15,50,96,0.15)', 'stroke-width':1 }, gridG);
+  txt('累計進球', {
+    x: f(ML - 34), y: f(MT + PH/2),
+    'text-anchor': 'middle', fill: '#b0bec5', 'font-size': '10',
+    transform: `rotate(-90 ${f(ML-34)} ${f(MT+PH/2)})`,
+  }, gridG);
+
+  // ── X-axis (WC years) ──
+  const axG = mk('g', {}, svg);
+  for (let i = 0; i < WC_YEARS.length; i++) {
+    const year = WC_YEARS[i];
+    const x = cx_year(year);
+    mk('line', { x1:f(x), y1:MT, x2:f(x), y2:MT+PH,
+      stroke:'rgba(15,50,96,0.05)', 'stroke-width':0.8 }, axG);
+    mk('line', { x1:f(x), y1:MT+PH, x2:f(x), y2:MT+PH+5,
+      stroke:'#cbd5e1', 'stroke-width':0.8 }, axG);
+    const labelX = i < WC_YEARS.length - 1
+      ? (x + cx_year(WC_YEARS[i + 1])) / 2
+      : x + (x - cx_year(WC_YEARS[i - 1])) / 2;
+    const labelY = MT + PH + 16;
+    txt(String(year), {
+      x: f(labelX), y: labelY,
+      'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '9.5',
+      'font-variant-numeric': 'tabular-nums',
+    }, axG);
+  }
+
+  // ── Build paths ──
+  const computed = {};
+  for (const [code, p] of Object.entries(playerData)) {
+    computed[code] = { ...p, ...buildCareerPath(p) };
+  }
+
+  const lineG = mk('g', {}, svg);
+  const dotG  = mk('g', {}, svg);
+  const lblG  = mk('g', {}, svg);
+
+  // Per-player group registry — {code, pLineG, pDotG, pLblG}
+  const allGroups = [];
+
+  // Resting de-emphasis: all lines drawn subtle; hover/tap emphasises one & dims the rest
+  const REST_OP = 0.78;
+
+  const dimOthers = exceptCode => {
+    for (const pg of allGroups) {
+      const dim = pg.code !== exceptCode;
+      pg.pLineG.setAttribute('opacity', dim ? '0.12' : '1');
+      pg.pDotG .setAttribute('opacity', dim ? '0.12' : '1');
+      pg.pLblG .setAttribute('opacity', dim ? '0.12' : '1');
+    }
+  };
+  const restoreAll = () => {
+    for (const pg of allGroups) {
+      pg.pLineG.setAttribute('opacity', String(REST_OP));
+      pg.pDotG .setAttribute('opacity', '1');
+      pg.pLblG .setAttribute('opacity', '1');
+    }
+  };
+
+  const endLabels = [];
+
+  for (const code of Object.keys(computed)) {
+    const p = computed[code];
+    const sw   = 2;
+    const dotR = 3;
+    const haloR = 5;
+
+    const pLineG = mk('g', { opacity: String(REST_OP) }, lineG);
+    const pDotG  = mk('g', {}, dotG);
+    const pLblG  = mk('g', {}, lblG);
+    const pg = { code, pLineG, pDotG, pLblG };
+    allGroups.push(pg);
+
+    // ── Polyline — start from first visible dot (midpoint between WC[0] and WC[1]) ──
+    let points;
+    if (p.pts.length >= 2) {
+      const midX = (cx_year(p.pts[0][0]) + cx_year(p.pts[1][0])) / 2;
+      const rest  = p.pts.slice(1).map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
+      points = `${f(midX)},${f(cy(p.pts[0][1]))} ${rest}`;
+    } else {
+      points = p.pts.map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
+    }
+    const visibleLine = mk('polyline', {
+      points, fill: 'none', stroke: p.color,
+      'stroke-width': sw,
+      'stroke-linejoin': 'miter', 'stroke-linecap': 'butt',
+    }, pLineG);
+    mk('polyline', {
+      points, fill: 'none', stroke: 'transparent', 'stroke-width': 14,
+      style: 'cursor:pointer',
+    }, pLineG);
+
+    const hiOn  = () => { visibleLine.setAttribute('stroke-width', 3.5); dimOthers(code); };
+    const hiOff = () => { visibleLine.setAttribute('stroke-width', sw); restoreAll(); };
+    pg.hiOn = hiOn;
+    pg.hiOff = hiOff;
+
+    pLineG.lastChild.addEventListener('mouseenter', hiOn);
+    pLineG.lastChild.addEventListener('mouseleave', hiOff);
+
+    // ── Dots ──
+    for (const dot of p.dots) {
+      if (dot.cumGoals === 0 || dot.tourGoals === 0) continue;
+      const dxNum = dot.isMid
+        ? (cx_year(dot.wx) + cx_year(dot.nextWx)) / 2
+        : cx_year(dot.wx);
+      const px = f(dxNum), py = f(cy(dot.cumGoals));
+      mk('circle', { cx: px, cy: py, r: haloR, fill: '#fff' }, pDotG);
+      mk('circle', { cx: px, cy: py, r: dotR,  fill: p.color }, pDotG);
+      const hit = mk('circle', { cx: px, cy: py, r: 13, fill: 'transparent', style: 'cursor:pointer' }, pDotG);
+      hit.addEventListener('mouseenter', e => { hiOn(); ttShow(e, dot, p.name, p.color); });
+      hit.addEventListener('mousemove',  ttMove);
+      hit.addEventListener('mouseleave', () => { hiOff(); ttHide(); });
+      hit.addEventListener('touchstart', e => { e.preventDefault(); hiOn(); ttShow(e, dot, p.name, p.color); }, { passive: false });
+      hit.addEventListener('touchend',   () => { hiOff(); ttHide(); });
+    }
+
+    // ── End label (collision-resolved after loop) ──
+    endLabels.push({ code, x: cx_year(p.endWC) + 8, y: cy(p.endY) + 4,
+                     flag: p.flag, name: p.name, endY: p.endY, color: p.color });
+  }
+
+  // Resolve label collisions: sort top→bottom, push DOWN if < 16px gap
+  endLabels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < endLabels.length; i++) {
+    if (endLabels[i].y - endLabels[i - 1].y < 16) {
+      endLabels[i].y = endLabels[i - 1].y + 16;
+    }
+  }
+  const LBL_FS = 12.5;
+  const halo = {
+    stroke: 'rgba(255,255,255,0.92)', 'stroke-width': '3.5',
+    'stroke-linejoin': 'round', 'paint-order': 'stroke fill',
+  };
+  for (const lbl of endLabels) {
+    const pg = allGroups.find(g => g.code === lbl.code);
+    // flag + name (black) + goals (player colour)
+    const flagW = LBL_FS * 1.3, flagH = LBL_FS * 1.3, gap = LBL_FS * 0.35;
+    mk('image', {
+      href: flagHref(lbl.flag), x: f(lbl.x), y: f(lbl.y - flagH * 0.82),
+      width: f(flagW), height: f(flagH),
+    }, pg.pLblG);
+    const nameX = lbl.x + flagW + gap;
+    txt(lbl.name, {
+      ...halo, x: f(nameX), y: f(lbl.y), 'text-anchor': 'start',
+      fill: '#1f2937', 'font-size': String(LBL_FS), 'font-weight': '400',
+    }, pg.pLblG);
+    const goalsX = nameX + estTextWidth(lbl.name, LBL_FS) + LBL_FS * 0.45;
+    txt(String(lbl.endY), {
+      ...halo, x: f(goalsX), y: f(lbl.y), 'text-anchor': 'start',
+      fill: lbl.color, 'font-size': String(LBL_FS), 'font-weight': '700',
+      'font-variant-numeric': 'tabular-nums',
+    }, pg.pLblG);
+    // Hovering / tapping the name triggers the same focus as hovering the line
+    pg.pLblG.setAttribute('style', 'cursor:pointer');
+    pg.pLblG.addEventListener('mouseenter', pg.hiOn);
+    pg.pLblG.addEventListener('mouseleave', pg.hiOff);
+    pg.pLblG.addEventListener('touchstart', e => { e.preventDefault(); pg.hiOn(); }, { passive: false });
+    pg.pLblG.addEventListener('touchend', pg.hiOff);
+  }
+}
+
+// ── Main ──
+async function main() {
+  let playerData = PLAYERS;
+  try {
+    const live2026 = await fetchTopScorers();
+    playerData = mergePlayerData(PLAYERS, live2026);
+  } catch (e) {
+    // GAS unavailable — fall back to static data silently
+  }
+  render(playerData);
+  window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
+}
+
+main();
+</script>
+</body>
+</html>
