@@ -100,7 +100,7 @@ body {
     </div>
 
     <div class="note-row">
-      僅列 2026 世界盃參賽球員；線條為其歷屆世界盃累計進球，點選或滑過任一球員可聚焦該人。2026 進球以即時資料為準。資料來源：FIFA / OPTA。
+      僅列累計進球5球以上且2026世界盃參賽球員；線條為其歷屆世界盃累計進球，點選或滑過任一球員可聚焦該球員。2026進球以即時資料為準。資料來源：FIFA / OPTA。
     </div>
   </div>
 </div>
@@ -246,6 +246,8 @@ function buildCareerPath(player) {
   const firstScoringIdx = tours.findIndex(t => t.goals > 0);
   if (firstScoringIdx < 0) return { pts: [], dots: [], endWC: tours[tours.length - 1].wc, endY: 0 };
 
+  pts.push([tours[firstScoringIdx].wc, 0]);
+
   for (let ti = firstScoringIdx; ti < tours.length; ti++) {
     const tour   = tours[ti];
     const isLast = ti === tours.length - 1;
@@ -363,11 +365,6 @@ function render(playerData) {
     }
   }
   mk('line', { x1:ML, y1:MT, x2:ML, y2:MT+PH, stroke:'rgba(15,50,96,0.15)', 'stroke-width':1 }, gridG);
-  txt('累計進球', {
-    x: f(ML - 34), y: f(MT + PH/2),
-    'text-anchor': 'middle', fill: '#b0bec5', 'font-size': '10',
-    transform: `rotate(-90 ${f(ML-34)} ${f(MT+PH/2)})`,
-  }, gridG);
 
   // ── X-axis (WC years) ──
   const axG = mk('g', {}, svg);
@@ -378,9 +375,7 @@ function render(playerData) {
       stroke:'rgba(15,50,96,0.05)', 'stroke-width':0.8 }, axG);
     mk('line', { x1:f(x), y1:MT+PH, x2:f(x), y2:MT+PH+5,
       stroke:'#cbd5e1', 'stroke-width':0.8 }, axG);
-    const labelX = i < WC_YEARS.length - 1
-      ? (x + cx_year(WC_YEARS[i + 1])) / 2
-      : x + (x - cx_year(WC_YEARS[i - 1])) / 2;
+    const labelX = x;
     const labelY = MT + PH + 16;
     txt(String(year), {
       x: f(labelX), y: labelY,
@@ -435,15 +430,8 @@ function render(playerData) {
     const pg = { code, pLineG, pDotG, pLblG };
     allGroups.push(pg);
 
-    // ── Polyline — start from first visible dot (midpoint between WC[0] and WC[1]) ──
-    let points;
-    if (p.pts.length >= 2) {
-      const midX = (cx_year(p.pts[0][0]) + cx_year(p.pts[1][0])) / 2;
-      const rest  = p.pts.slice(1).map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
-      points = `${f(midX)},${f(cy(p.pts[0][1]))} ${rest}`;
-    } else {
-      points = p.pts.map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
-    }
+    // ── Polyline — start from actual year gridline ──
+    const points = p.pts.map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
     const visibleLine = mk('polyline', {
       points, fill: 'none', stroke: p.color,
       'stroke-width': sw,
@@ -465,9 +453,7 @@ function render(playerData) {
     // ── Dots ──
     for (const dot of p.dots) {
       if (dot.cumGoals === 0 || dot.tourGoals === 0) continue;
-      const dxNum = dot.isMid
-        ? (cx_year(dot.wx) + cx_year(dot.nextWx)) / 2
-        : cx_year(dot.wx);
+      const dxNum = cx_year(dot.wx);
       const px = f(dxNum), py = f(cy(dot.cumGoals));
       mk('circle', { cx: px, cy: py, r: haloR, fill: '#fff' }, pDotG);
       mk('circle', { cx: px, cy: py, r: dotR,  fill: p.color }, pDotG);
