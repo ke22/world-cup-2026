@@ -128,6 +128,7 @@ body {
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
 const CACHE_KEY = 'wc26_scorers';
 const CACHE_TTL = 60; // seconds
+const LS_KEY = 'wc26_scorers_v1';
 
 // ── 11 players who participate in the 2026 World Cup ──
 // career omits non-participation years; 2026 goals are static fallbacks that the
@@ -136,7 +137,7 @@ const CACHE_TTL = 60; // seconds
 const PLAYERS = {
   messi:    { name: '梅西',      flag: '🇦🇷', country: 'ARG', color: '#1565C0', career: [
     { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
-    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 5 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 6 },
   ]},
   mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
     { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
@@ -407,14 +408,24 @@ function render(playerData) {
 
 // ── Main ──
 async function main() {
-  let playerData = PLAYERS;
+  let rendered = false;
+  try {
+    const cached = localStorage.getItem(LS_KEY);
+    if (cached) {
+      render(mergePlayerData(PLAYERS, JSON.parse(cached)));
+      rendered = true;
+    }
+  } catch {}
+
   try {
     const live2026 = await fetchTopScorers();
-    playerData = mergePlayerData(PLAYERS, live2026);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(live2026)); } catch {}
+    render(mergePlayerData(PLAYERS, live2026));
+    rendered = true;
   } catch (e) {
-    // GAS unavailable — fall back to static data silently
+    if (!rendered) render(PLAYERS);
   }
-  render(playerData);
+
   window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
 }
 

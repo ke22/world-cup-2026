@@ -123,6 +123,7 @@ body {
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
 const CACHE_KEY = 'wc26_scorers';
 const CACHE_TTL = 60; // seconds
+const LS_KEY = 'wc26_scorers_v1';
 
 // ── Static historical data (pre-2026) ── Source: FIFA / OPTA
 // active: true  → coloured line (2.5px), labels; 2026 live data appended
@@ -133,7 +134,7 @@ const HISTORICAL_DATA = {
   ]},
   messi:     { name: '梅西',       flag: '🇦🇷', color: '#1565C0', active: true,  career: [
     { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
-    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 5 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 6 },
   ]},
   cronaldo:  { name: 'C羅納度',    flag: '🇵🇹', color: '#2E7D32', active: true,  career: [
     { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
@@ -540,18 +541,24 @@ function render(playerData) {
 
 // ── Main ──
 async function main() {
-  let playerData = HISTORICAL_DATA;
+  let rendered = false;
+  try {
+    const cached = localStorage.getItem(LS_KEY);
+    if (cached) {
+      render(mergePlayerData(HISTORICAL_DATA, JSON.parse(cached)));
+      rendered = true;
+    }
+  } catch {}
 
   try {
     const live2026 = await fetchTopScorers();
-    playerData = mergePlayerData(HISTORICAL_DATA, live2026);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(live2026)); } catch {}
+    render(mergePlayerData(HISTORICAL_DATA, live2026));
+    rendered = true;
   } catch (e) {
-    // GAS unavailable — fall back to historical data silently
+    if (!rendered) render(HISTORICAL_DATA);
   }
 
-  render(playerData);
-
-  // Report height to parent frame
   window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
 }
 
