@@ -184,8 +184,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
   display: flex; flex-direction: column; align-items: center;
   gap: 4px; flex: 1; padding: 0 8px;
 }
-.score-finished { font-size: 1.8rem; font-weight: 800; color: var(--fg); letter-spacing: 4px; }
+.score-finished { font-size: 1.8rem; font-weight: 800; color: var(--fg); letter-spacing: 4px; white-space: nowrap; }
 .score-live     { font-size: 1.7rem; font-weight: 800; color: var(--live-color); letter-spacing: 4px; }
+.pen-score      { font-size: 0.55em; font-weight: 700; color: var(--muted); letter-spacing: 0; vertical-align: 0.18em; margin: 0 1px; }
 .kickoff-time   { font-size: 16px; font-weight: 400; color: var(--accent); display: flex; flex-direction: column; align-items: center; gap: 1px; white-space: nowrap; }
 .kt-ampm        { font-size: 0.65em; font-weight: 500; }
 .tz-note        { font-size: 0.58rem; font-weight: 400; color: var(--muted); letter-spacing: 0.3px; }
@@ -309,8 +310,8 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 
 <script>
 // ── 部署時修改這裡 ───────────────────────────
-const GAS_URL      = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';   // GAS Web App 部署 URL
-const CACHE_TTL    = 0;    // 快取秒數；0 = 每次載入都讀最新資料
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';   // GAS Web App 部署 URL
+const CACHE_TTL    = 60;   // 快取秒數；背景一律重新抓取，此值僅影響快取保留時間
 const LIVE_REFRESH = 60;   // live 場次自動刷新秒數
 const TEAM_NAMES_BY_CODE = { BIH: '波赫', CUW: '古拉索', CGO: '民主剛果' };
 function teamName(team) {
@@ -385,6 +386,15 @@ function cacheGet(key) {
     if (Date.now() - ts < CACHE_TTL * 1000) return data;
     localStorage.removeItem(key);
     return null;
+  } catch { return null; }
+}
+
+function cacheGetStale(key) {
+  // Returns cached data regardless of age (for instant first paint).
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw).data;
   } catch { return null; }
 }
 
@@ -575,9 +585,13 @@ function renderMatchCard(m) {
   let cardClass  = 'match-card';
 
   const hasScore = m.score1 !== null && m.score2 !== null;
+  const hasPen   = m.pen1 !== null && m.pen1 !== undefined && m.pen2 !== null && m.pen2 !== undefined;
 
   if (m.status === 'finished' && hasScore) {
-    centerHtml = `<div class="score-finished">${m.score1}&thinsp;:&thinsp;${m.score2}</div>`;
+    // Penalty shootout → "1 (4) : 1 (2)" with the PK score bracketed next to each side.
+    const p1 = hasPen ? `<span class="pen-score">(${m.pen1})</span>` : '';
+    const p2 = hasPen ? `<span class="pen-score">(${m.pen2})</span>` : '';
+    centerHtml = `<div class="score-finished">${m.score1}${p1}&thinsp;:&thinsp;${m.score2}${p2}</div>`;
   } else if (m.status === 'live' && hasScore) {
     cardClass += ' live';
     centerHtml = `
@@ -736,8 +750,9 @@ async function init() {
     return;
   }
 
-  // Render from cache immediately (shows kickoff times before API responds)
-  const cached = cacheGet('wc26_all');
+  // Render from cache immediately (shows kickoff times before API responds).
+  // Use stale read so first paint works regardless of age — background fetch revalidates.
+  const cached = cacheGetStale('wc26_all');
   if (cached) {
     allMatches = cached;
     activeDate = findInitialDate();

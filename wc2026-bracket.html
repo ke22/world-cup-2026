@@ -713,8 +713,8 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
-const CACHE_TTL = 0;
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+const CACHE_TTL = 60;
 function parseTwemoji(el) {
   if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
 }
@@ -776,14 +776,46 @@ function cacheGet(k) {
     return Date.now() - ts < CACHE_TTL * 1000 ? data : null;
   } catch { return null; }
 }
+function cacheGetStale(k) {
+  // Returns cached data regardless of age (for instant first paint).
+  try {
+    const r = localStorage.getItem(k);
+    if (!r) return null;
+    return JSON.parse(r).data;
+  } catch { return null; }
+}
 function cacheSet(k, d) {
   try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
 }
+async function fetchMockMatches() {
+  const candidates = [
+    'mock/matches.json',
+    '/mock/matches.json',
+    '../mock/matches.json',
+    '../../mock/matches.json',
+    '../../../mock/matches.json',
+    '/missions/embed/wc2026/mock/matches.json',
+  ];
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate, location.href).href;
+      const res = await fetch(`${url}?_=${Date.now()}`);
+      if (res.ok) return res;
+    } catch {}
+  }
+  throw new Error('Unable to load mock matches JSON from any known location');
+}
 async function fetchAllMatches() {
-  if (new URLSearchParams(location.search).get('t')) localStorage.removeItem('wc26_all');
+  const params = new URLSearchParams(location.search);
+  if (params.get('t') || params.get('mock') === '1') localStorage.removeItem('wc26_all');
   const hit = cacheGet('wc26_all');
   if (hit) return hit;
-  const res  = await fetch(`${GAS_URL}?action=getMatches&_=${Date.now()}`);
+  let res;
+  if (params.get('mock') === '1') {
+    res = await fetchMockMatches();
+  } else {
+    res = await fetch(`${GAS_URL}?action=getMatches&_=${Date.now()}`);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json.status === 'error') throw new Error(json.message);
@@ -912,8 +944,15 @@ function renderDesktop(matches) {
     ...r32raw.filter(m => !R32_ORDER.includes(m.match_id)),
   ];
 
+  const R16_BRACKET_ORDER = [89,90,94,93,91,92,96,95];
+  const r16ById = Object.fromEntries(r16.map(m => [m.match_id, m]));
+  const r16Ordered = [
+    ...R16_BRACKET_ORDER.map(id => r16ById[id]).filter(Boolean),
+    ...r16.filter(m => !R16_BRACKET_ORDER.includes(m.match_id)),
+  ];
+
   const r32L=r32.slice(0,8), r32R=r32.slice(8,16);
-  const r16L=r16.slice(0,4), r16R=r16.slice(4,8);
+  const r16L=r16Ordered.slice(0,4), r16R=r16Ordered.slice(4,8);
   const qfL=qf.slice(0,2),   qfR=qf.slice(2,4);
   const sfL=sf[0],            sfR=sf[1];
 
@@ -1302,6 +1341,27 @@ function toggleRound(btn) {
 }
 
 /* ── Init ──────────────────────────────────────── */
+let _bracketRendered = false;
+
+function renderMatches(all) {
+  const ko = all.filter(m => [PHASE_R32,PHASE_R16,PHASE_QF,PHASE_SF,PHASE_3RD,PHASE_F].includes(m.phase));
+  const activePhase = getActivePhase(ko);
+
+  document.getElementById('bracket-desktop').innerHTML = renderDesktop(ko);
+  _bracketRendered = true;
+  _cachedCols = null;
+  parseTwemoji(document.getElementById('bracket-desktop'));
+  // Sync mobile nav button active states after render
+  if (window.innerWidth < 660) syncMobileNavButtons();
+  requestAnimationFrame(fitBracket);
+}
+
+// Paint instantly from any cached data (even stale) before the network resolves.
+function renderFromCache() {
+  const stale = cacheGetStale('wc26_all');
+  if (stale) renderMatches(stale);
+}
+
 async function init() {
   if (!GAS_URL) {
     document.getElementById('bracket-desktop').innerHTML =
@@ -1312,21 +1372,15 @@ async function init() {
   let all;
   try { all = await fetchAllMatches(); }
   catch {
-    document.getElementById('bracket-desktop').innerHTML =
-      '<div class="bracket-panel"><div class="state-msg state-error">資料載入失敗，請稍後重試</div></div>';
-    notifyHeight();
+    // Keep any already-painted (stale) view instead of wiping it on a transient error.
+    if (!_bracketRendered) {
+      document.getElementById('bracket-desktop').innerHTML =
+        '<div class="bracket-panel"><div class="state-msg state-error">資料載入失敗，請稍後重試</div></div>';
+      notifyHeight();
+    }
     return;
   }
-
-  const ko = all.filter(m => [PHASE_R32,PHASE_R16,PHASE_QF,PHASE_SF,PHASE_3RD,PHASE_F].includes(m.phase));
-  const activePhase = getActivePhase(ko);
-
-  document.getElementById('bracket-desktop').innerHTML = renderDesktop(ko);
-  _cachedCols = null;
-  parseTwemoji(document.getElementById('bracket-desktop'));
-  // Sync mobile nav button active states after render
-  if (window.innerWidth < 660) syncMobileNavButtons();
-  requestAnimationFrame(fitBracket);
+  renderMatches(all);
 }
 
 let _bracketRefreshInFlight = false;
@@ -1348,7 +1402,8 @@ function startBracketAutoRefresh() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await refreshBracket();
+  renderFromCache();        // instant paint from cache (stale-while-revalidate)
+  await refreshBracket();   // fetch fresh in background, then re-render
   startBracketAutoRefresh();
 });
 
