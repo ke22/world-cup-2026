@@ -223,8 +223,8 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 </div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
-const CACHE_TTL = 0;
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+const CACHE_TTL = 60;
 const TEAM_NAMES_BY_CODE = { BIH: '波赫', CUW: '古拉索', CGO: '民主剛果' };
 function teamName(team) {
   if (!team) return '';
@@ -243,6 +243,15 @@ function cacheGet(key) {
     if (Date.now() - ts < CACHE_TTL * 1000) return data;
     localStorage.removeItem(key);
     return null;
+  } catch { return null; }
+}
+
+function cacheGetStale(key) {
+  // Returns cached data regardless of age (for instant first paint).
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw).data;
   } catch { return null; }
 }
 
@@ -383,6 +392,21 @@ function initScrollSync() {
   }, { passive: true });
 }
 
+let _groupsRendered = false;
+
+function paintGroups(groups) {
+  renderGroups(groups);
+  _groupsRendered = true;
+  parseTwemoji(document.getElementById('groups-container'));
+  initScrollSync();
+  notifyHeight();
+}
+
+function renderGroupsFromCache() {
+  const stale = cacheGetStale('wc26_groups');
+  if (stale) paintGroups(stale);
+}
+
 async function init() {
   if (!GAS_URL) {
     document.getElementById('groups-container').innerHTML =
@@ -390,16 +414,17 @@ async function init() {
     notifyHeight();
     return;
   }
+  renderGroupsFromCache();   // instant paint from cache (stale-while-revalidate)
   try {
     const groups = await fetchGroups();
-    renderGroups(groups);
-    parseTwemoji(document.getElementById('groups-container'));
-    initScrollSync();
-    notifyHeight();
+    paintGroups(groups);
   } catch (err) {
-    document.getElementById('groups-container').innerHTML =
-      `<div class="state-msg state-error">積分榜載入失敗，請稍後重試</div>`;
-    notifyHeight();
+    // Keep any already-painted (stale) view instead of wiping it on a transient error.
+    if (!_groupsRendered) {
+      document.getElementById('groups-container').innerHTML =
+        `<div class="state-msg state-error">積分榜載入失敗，請稍後重試</div>`;
+      notifyHeight();
+    }
   }
 }
 
