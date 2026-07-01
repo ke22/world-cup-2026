@@ -100,7 +100,7 @@ body {
     </div>
 
     <div class="note-row">
-      僅列 2026 世界盃參賽球員；線條為其歷屆世界盃累計進球，點選或滑過任一球員可聚焦該人。2026 進球以即時資料為準。資料來源：FIFA / OPTA。
+      僅列累計進球5球以上且2026世界盃參賽球員；線條為其歷屆世界盃累計進球，點選或滑過任一球員可聚焦該球員。2026進球以即時資料為準。資料來源：FIFA / OPTA。
     </div>
   </div>
 </div>
@@ -114,17 +114,18 @@ body {
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
-const CACHE_KEY = 'wc26_scorers';
+const RACE_CACHE_KEY = 'wc26_race';
 const CACHE_TTL = 60; // seconds
 
-// ── 11 players who participate in the 2026 World Cup ──
-// career omits non-participation years; 2026 goals are static fallbacks that the
-// live GAS getTopScorers feed overrides when a player_code matches (see ALIASES).
+// ── 11 players who participate in the 2026 World Cup (offline fallback only) ──
+// career omits non-participation years. These numbers are used ONLY when the live
+// getScorerRace feed is unreachable; the sheet's career tab (the single source of
+// truth, shared with wc2026-scorers-bars.html) overrides this whenever GAS responds.
 // Source: FIFA / OPTA.
 const PLAYERS = {
   messi:    { name: '梅西',      flag: '🇦🇷', country: 'ARG', color: '#1565C0', career: [
     { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
-    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 5 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 6 },
   ]},
   mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
     { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
@@ -159,17 +160,28 @@ const PLAYERS = {
   ]},
 };
 
-// ── GAS player_code → internal key aliases ──
-// The live merge only fires when the feed's player_code resolves to one of the
-// PLAYERS keys above. Most internal keys already match the likely feed codes
-// directly (neymar, lukaku, gakpo, vinicius, valencia, perisic). Only codes that
-// differ need an entry here. Players whose feed code we cannot confirm fall back
-// to their static 2026 value above (no error).
-const ALIASES = {
-  'ronaldo': 'cronaldo',          // feed uses 'ronaldo' for C. Ronaldo
-  'james_rodriguez': 'james',     // assumed; falls back to static if unmatched
-  'james': 'james',
-  'enner_valencia': 'valencia',   // assumed; falls back to static if unmatched
+// ── Presentation meta keyed by player_id from getScorerRace ──
+// Colours and flags live in code (not in the sheet); name falls back to the
+// sheet's player_name_zh unless overridden here. To add a player: add rows to
+// the sheet's career tab AND a line here for its colour/flag.
+const META = {
+  'lionel-messi':      { color: '#1565C0', flag: '🇦🇷' },
+  'kylian-mbappe':     { color: '#D32F2F', flag: '🇫🇷' },
+  'cristiano-ronaldo': { color: '#2E7D32', flag: '🇵🇹', name: 'C羅納度' },
+  'harry-kane':        { color: '#7B1FA2', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+  'neymar':            { color: '#FB8C00', flag: '🇧🇷' },
+  'enner-valencia':    { color: '#AD1457', flag: '🇪🇨' },
+  'james-rodriguez':   { color: '#6D4C41', flag: '🇨🇴' },
+  'romelu-lukaku':     { color: '#EC407A', flag: '🇧🇪' },
+  'ivan-perisic':      { color: '#3949AB', flag: '🇭🇷' },
+  'cody-gakpo':        { color: '#00897B', flag: '🇳🇱' },
+  'vinicius-junior':   { color: '#00BCD4', flag: '🇧🇷' },
+  'erling-haaland':    { color: '#F9A825', flag: '🇳🇴' },
+};
+// Fallback flag by country_code when a player_id isn't in META above
+const FLAG_BY_CC = {
+  ARG:'🇦🇷', FRA:'🇫🇷', POR:'🇵🇹', ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', BRA:'🇧🇷',
+  ECU:'🇪🇨', COL:'🇨🇴', BEL:'🇧🇪', CRO:'🇭🇷', NED:'🇳🇱', NOR:'🇳🇴',
 };
 
 // ── sessionStorage cache ──
@@ -187,36 +199,33 @@ function cacheSet(key, data) {
   try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
 
-// ── Fetch live 2026 data ──
-async function fetchTopScorers() {
-  const hit = cacheGet(CACHE_KEY);
+// ── Fetch full scorer-career data from GAS ──
+async function fetchScorerRace() {
+  const hit = cacheGet(RACE_CACHE_KEY);
   if (hit) return hit;
-  const url = GAS_URL + '?action=getTopScorers';
-  const res = await fetch(url);
+  const res = await fetch(GAS_URL + '?action=getScorerRace');
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json.status !== 'ok') throw new Error(json.message || 'API error');
-  cacheSet(CACHE_KEY, json.data);
+  cacheSet(RACE_CACHE_KEY, json.data);
   return json.data;
 }
 
-// ── Merge live 2026 goals into a deep copy of PLAYERS ──
-function mergePlayerData(base, live2026) {
-  const merged = {};
-  for (const [code, p] of Object.entries(base)) {
-    merged[code] = { ...p, career: p.career.map(t => ({ ...t })) };
+// ── Convert getScorerRace rows → PLAYERS shape, keeping only 2026 participants ──
+function buildFromRace(raceData) {
+  const out = {};
+  for (const p of raceData) {
+    if (!p.career.some(c => c.year === 2026)) continue;   // 2026 participants only
+    const m = META[p.player_id] || {};
+    out[p.player_id] = {
+      name: m.name || p.name_zh,
+      flag: m.flag || FLAG_BY_CC[p.country_code] || '🏳️',
+      color: m.color || '#90a4ae',
+      country: p.country_code,
+      career: p.career.map(c => ({ wc: c.year, goals: c.goals })),
+    };
   }
-  for (const lp of live2026) {
-    const code = ALIASES[lp.player_code] || lp.player_code;
-    if (!merged[code]) continue;
-    if (lp.matches_played_2026 > 0) {
-      const entry = { wc: 2026, goals: lp.total_goals_2026 };
-      const idx = merged[code].career.findIndex(t => t.wc === 2026);
-      if (idx >= 0) merged[code].career[idx] = entry;
-      else merged[code].career.push(entry);
-    }
-  }
-  return merged;
+  return out;
 }
 
 // ── Chart geometry ──
@@ -244,6 +253,8 @@ function buildCareerPath(player) {
 
   const firstScoringIdx = tours.findIndex(t => t.goals > 0);
   if (firstScoringIdx < 0) return { pts: [], dots: [], endWC: tours[tours.length - 1].wc, endY: 0 };
+
+  pts.push([tours[firstScoringIdx].wc, 0]);
 
   for (let ti = firstScoringIdx; ti < tours.length; ti++) {
     const tour   = tours[ti];
@@ -362,11 +373,6 @@ function render(playerData) {
     }
   }
   mk('line', { x1:ML, y1:MT, x2:ML, y2:MT+PH, stroke:'rgba(15,50,96,0.15)', 'stroke-width':1 }, gridG);
-  txt('累計進球', {
-    x: f(ML - 34), y: f(MT + PH/2),
-    'text-anchor': 'middle', fill: '#b0bec5', 'font-size': '10',
-    transform: `rotate(-90 ${f(ML-34)} ${f(MT+PH/2)})`,
-  }, gridG);
 
   // ── X-axis (WC years) ──
   const axG = mk('g', {}, svg);
@@ -377,9 +383,7 @@ function render(playerData) {
       stroke:'rgba(15,50,96,0.05)', 'stroke-width':0.8 }, axG);
     mk('line', { x1:f(x), y1:MT+PH, x2:f(x), y2:MT+PH+5,
       stroke:'#cbd5e1', 'stroke-width':0.8 }, axG);
-    const labelX = i < WC_YEARS.length - 1
-      ? (x + cx_year(WC_YEARS[i + 1])) / 2
-      : x + (x - cx_year(WC_YEARS[i - 1])) / 2;
+    const labelX = x;
     const labelY = MT + PH + 16;
     txt(String(year), {
       x: f(labelX), y: labelY,
@@ -434,15 +438,8 @@ function render(playerData) {
     const pg = { code, pLineG, pDotG, pLblG };
     allGroups.push(pg);
 
-    // ── Polyline — start from first visible dot (midpoint between WC[0] and WC[1]) ──
-    let points;
-    if (p.pts.length >= 2) {
-      const midX = (cx_year(p.pts[0][0]) + cx_year(p.pts[1][0])) / 2;
-      const rest  = p.pts.slice(1).map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
-      points = `${f(midX)},${f(cy(p.pts[0][1]))} ${rest}`;
-    } else {
-      points = p.pts.map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
-    }
+    // ── Polyline — start from actual year gridline ──
+    const points = p.pts.map(([yr, g]) => `${f(cx_year(yr))},${f(cy(g))}`).join(' ');
     const visibleLine = mk('polyline', {
       points, fill: 'none', stroke: p.color,
       'stroke-width': sw,
@@ -464,9 +461,7 @@ function render(playerData) {
     // ── Dots ──
     for (const dot of p.dots) {
       if (dot.cumGoals === 0 || dot.tourGoals === 0) continue;
-      const dxNum = dot.isMid
-        ? (cx_year(dot.wx) + cx_year(dot.nextWx)) / 2
-        : cx_year(dot.wx);
+      const dxNum = cx_year(dot.wx);
       const px = f(dxNum), py = f(cy(dot.cumGoals));
       mk('circle', { cx: px, cy: py, r: haloR, fill: '#fff' }, pDotG);
       mk('circle', { cx: px, cy: py, r: dotR,  fill: p.color }, pDotG);
@@ -524,16 +519,20 @@ function render(playerData) {
 }
 
 // ── Main ──
-async function main() {
-  let playerData = PLAYERS;
-  try {
-    const live2026 = await fetchTopScorers();
-    playerData = mergePlayerData(PLAYERS, live2026);
-  } catch (e) {
-    // GAS unavailable — fall back to static data silently
-  }
-  render(playerData);
+function postHeight() {
   window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
+}
+async function main() {
+  // Paint the hardcoded fallback immediately so the chart never sits blank while
+  // the GAS request is in flight; swap in live data the moment it arrives.
+  render(PLAYERS);
+  postHeight();
+  try {
+    const built = buildFromRace(await fetchScorerRace());
+    if (Object.keys(built).length) { render(built); postHeight(); }
+  } catch (e) {
+    // GAS unavailable — keep the fallback already on screen
+  }
 }
 
 main();
