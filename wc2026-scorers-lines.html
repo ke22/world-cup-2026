@@ -128,14 +128,14 @@ const PLAYERS = {
     { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 6 },
   ]},
   mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
-    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
+    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 6 },
   ]},
   cronaldo: { name: 'C羅納度',   flag: '🇵🇹', country: 'POR', color: '#2E7D32', career: [
     { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
-    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 2 },
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 3 },
   ]},
   kane:     { name: '凱恩',      flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', country: 'ENG', color: '#7B1FA2', career: [
-    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 2 },
+    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 5 },
   ]},
   neymar:   { name: '內馬爾',    flag: '🇧🇷', country: 'BRA', color: '#FB8C00', career: [
     { wc: 2014, goals: 4 }, { wc: 2018, goals: 2 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 0 },
@@ -147,16 +147,25 @@ const PLAYERS = {
     { wc: 2014, goals: 6 }, { wc: 2018, goals: 0 }, { wc: 2026, goals: 0 },
   ]},
   lukaku:   { name: '盧卡庫',    flag: '🇧🇪', country: 'BEL', color: '#EC407A', career: [
-    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 0 }, { wc: 2026, goals: 1 },
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 0 }, { wc: 2026, goals: 2 },
   ]},
   perisic:  { name: '柏瑞斯奇',  flag: '🇭🇷', country: 'CRO', color: '#3949AB', career: [
-    { wc: 2014, goals: 2 }, { wc: 2018, goals: 3 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 0 },
+    { wc: 2014, goals: 2 }, { wc: 2018, goals: 3 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 1 },
   ]},
   gakpo:    { name: '哈克波',    flag: '🇳🇱', country: 'NED', color: '#00897B', career: [
     { wc: 2022, goals: 3 }, { wc: 2026, goals: 3 },
   ]},
   vinicius: { name: '維尼修斯',  flag: '🇧🇷', country: 'BRA', color: '#00BCD4', career: [
     { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
+  ]},
+  haaland:  { name: '哈蘭德',    flag: '🇳🇴', country: 'NOR', color: '#F9A825', career: [
+    { wc: 2026, goals: 5 },
+  ]},
+  sarr:     { name: '薩爾',      flag: '🇸🇳', country: 'SEN', color: '#7CB342', career: [
+    { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
+  ]},
+  havertz:  { name: '哈斐茨',    flag: '🇩🇪', country: 'GER', color: '#546E7A', career: [
+    { wc: 2022, goals: 2 }, { wc: 2026, goals: 3 },
   ]},
 };
 
@@ -177,11 +186,14 @@ const META = {
   'cody-gakpo':        { color: '#00897B', flag: '🇳🇱' },
   'vinicius-junior':   { color: '#00BCD4', flag: '🇧🇷' },
   'erling-haaland':    { color: '#F9A825', flag: '🇳🇴' },
+  'ismaila-sarr':      { color: '#7CB342', flag: '🇸🇳' },
+  'kai-havertz':       { color: '#546E7A', flag: '🇩🇪' },
 };
 // Fallback flag by country_code when a player_id isn't in META above
 const FLAG_BY_CC = {
   ARG:'🇦🇷', FRA:'🇫🇷', POR:'🇵🇹', ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', BRA:'🇧🇷',
   ECU:'🇪🇨', COL:'🇨🇴', BEL:'🇧🇪', CRO:'🇭🇷', NED:'🇳🇱', NOR:'🇳🇴',
+  SEN:'🇸🇳', GER:'🇩🇪',
 };
 
 // ── sessionStorage cache ──
