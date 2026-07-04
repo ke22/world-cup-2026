@@ -451,6 +451,7 @@ body {
 .mn-score { font-size: 0.9rem; font-weight: 800; color: var(--fg); min-width: 14px; text-align: right; flex-shrink: 0; }
 .mn-score.winner { color: var(--accent); }
 .mn-score.live   { color: var(--live-color); }
+.mn-pk { font-size: 0.7em; font-weight: 700; color: var(--muted, #888); margin-left: 1px; }
 
 /* ── Center column (trophy + Final) ── */
 .bracket-center {
@@ -644,6 +645,7 @@ body {
 .mobile-center { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
 .mobile-score  { font-size: 1.6rem; font-weight: 800; color: var(--fg); letter-spacing: 3px; }
 .mobile-score.live { color: var(--live-color); }
+.mobile-pk { font-size: 0.55em; font-weight: 700; color: var(--muted, #888); letter-spacing: 0; }
 .mobile-time   { font-size: 1.2rem; font-weight: 300; color: var(--accent); }
 
 .live-badge { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--live-color); letter-spacing: 0.8px; }
@@ -828,6 +830,22 @@ function isTBD(t) { return !t.code && !t.name; }
 const TEAM_NAMES_BY_CODE = { BIH: '波赫', CUW: '古拉索', CGO: '民主剛果' };
 function teamName(t) { return TEAM_NAMES_BY_CODE[t.code] || t.name || t.code || ''; }
 
+/* Penalty shootout (knockout only). pen1/pen2 come from getMatches. */
+function hasPen(m) { return m.pen1 != null && m.pen2 != null; }
+/* Winner index of a finished match: 0 = team1, 1 = team2, -1 = none/undecided.
+   A level score is resolved by the PK shootout so a draw still picks a winner. */
+function winnerIdx(m) {
+  if (!m || m.status !== 'finished' || m.score1 == null || m.score2 == null) return -1;
+  if (m.score1 !== m.score2) return m.score1 > m.score2 ? 0 : 1;
+  if (hasPen(m) && m.pen1 !== m.pen2) return m.pen1 > m.pen2 ? 0 : 1;
+  return -1;
+}
+/* Bracketed PK score for one side, e.g. "(4)". Empty when no shootout. */
+function penTag(m, teamIdx) {
+  if (!hasPen(m)) return '';
+  return `<span class="mn-pk">(${teamIdx === 0 ? m.pen1 : m.pen2})</span>`;
+}
+
 function isAllTBD(ms)  { return ms.length > 0 && ms.every(m => isTBD(m.team1) && isTBD(m.team2)); }
 function isAllDone(ms) { return ms.length > 0 && ms.every(m => m.status === 'finished'); }
 
@@ -857,8 +875,8 @@ function buildNode(m) {
 
     let scoreHtml = '';
     if ((fin || liv) && score != null) {
-      const w = fin && ((idx===0 && m.score1 > m.score2) || (idx===1 && m.score2 > m.score1));
-      scoreHtml = `<span class="mn-score${w?' winner':liv?' live':''}">${score}</span>`;
+      const w = fin && winnerIdx(m) === idx;
+      scoreHtml = `<span class="mn-score${w?' winner':liv?' live':''}">${score}${fin?penTag(m,idx):''}</span>`;
     }
     return `<div class="mn-row">
       ${flagHtml}<span class="mn-name${nameCls?' '+nameCls:''}">${label||'待定'}</span>${scoreHtml}
@@ -889,8 +907,8 @@ function buildCenterSlot(m, teamIdx) {
 
   let scoreHtml = '';
   if ((fin || liv) && score != null) {
-    const w = fin && score > oppScore;
-    scoreHtml = `<span class="mn-score${w ? ' winner' : liv ? ' live' : ''}">${score}</span>`;
+    const w = fin && winnerIdx(m) === teamIdx;
+    scoreHtml = `<span class="mn-score${w ? ' winner' : liv ? ' live' : ''}">${score}${fin?penTag(m,teamIdx):''}</span>`;
   }
   return `<div class="center-slot">
     <span class="mn-flag">${tbd ? '' : t.flag}</span>
@@ -1045,10 +1063,10 @@ function renderDesktop(matches) {
     const fin   = m?.status === 'finished';
     const liv   = m?.status === 'live';
     const tbd   = !t || isTBD(t);
-    const win   = fin && score != null && score > opp;
+    const win   = fin && winnerIdx(m) === teamIdx;
     let scoreHtml = '';
     if ((fin || liv) && score != null)
-      scoreHtml = `<span class="mn-score${win?' winner':liv?' live':''}">${score}</span>`;
+      scoreHtml = `<span class="mn-score${win?' winner':liv?' live':''}">${score}${fin?penTag(m,teamIdx):''}</span>`;
     const node = `<div class="match-node${fin?' finished':liv?' live':''}">
       <div class="mn-row">
         <span class="mn-flag">${tbd?'':t.flag}</span>
@@ -1072,8 +1090,9 @@ function renderDesktop(matches) {
   // Trophy center (winner only)
   function trophyCenter() {
     let innerHtml = '';
-    if (fin && fin.status === 'finished') {
-      const w = fin.score1 > fin.score2 ? fin.team1 : fin.team2;
+    const champIdx = fin ? winnerIdx(fin) : -1;
+    if (fin && fin.status === 'finished' && champIdx !== -1) {
+      const w = champIdx === 0 ? fin.team1 : fin.team2;
       innerHtml = `<div class="champion-flag">${w.flag}</div><div class="champion-name">${teamName(w)}</div>`;
     } else {
       innerHtml = `<div class="center-tbd">待定</div>`;
@@ -1254,7 +1273,7 @@ function buildMobileMatch(m) {
   if (liv) cls += ' live';
 
   let center = '';
-  if (fin)      center = `<div class="mobile-score">${m.score1}&thinsp;:&thinsp;${m.score2}</div>`;
+  if (fin)      center = `<div class="mobile-score">${m.score1}${hasPen(m)?`<span class="mobile-pk">(${m.pen1})</span>`:''}&thinsp;:&thinsp;${m.score2}${hasPen(m)?`<span class="mobile-pk">(${m.pen2})</span>`:''}</div>`;
   else if (liv) center = `<div class="live-badge"><span class="live-dot"></span>LIVE</div>
                            <div class="mobile-score live">${m.score1??'?'}&thinsp;:&thinsp;${m.score2??'?'}</div>`;
   else          center = `<div class="mobile-time">${m.time_utc8}</div>`;
