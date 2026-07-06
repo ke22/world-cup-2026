@@ -1,3 +1,10 @@
+# world-cup-2026
+What: World Cup 2026 live scoreboard and group-stage tracker (embedded in CNA CMS)
+Stack: Google Apps Script + HTML/CSS + ECharts
+Entry: Code.gs
+Build: clasp push (or publish via Apps Script IDE)
+Ignore: emoji/, *.jpg, *.png
+
 <!-- SPECTRA:START v1.0.2 -->
 
 # Spectra Instructions

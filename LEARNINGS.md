@@ -201,3 +201,11 @@ live 或 finished 狀態即使 fullTime 尚空也要同步；比分為 null 時�
 `getR32SeedMap()`（後端）與 `R32_SEEDS`（前端 `wc2026-bracket.html`）兩份必須等價，已逐場比對 16 場 73–88 完全一致；並已對照 Wikipedia「2026 FIFA World Cup knockout stage」官方對陣表全部 16 場吻合（小組第 1/2 與第三名 pool 皆正確）。
 
 **待辦**：`getThirdPlaceAllocation()` 的 495 組「最佳第三名 → slot」分配表為機器產生（自 Wikipedia 解析），組合 pool 已驗證，但**逐組合的 slot 指派尚未對照 FIFA 官方規程 Annex**。只在 8 隊晉級第三名全部確定後才影響顯示，賽前應完成核對。
+
+---
+
+## 20. GAS 多份部署 URL：欄位沒顯示可能是前端指向舊部署
+
+**問題**：後端 `Code.gs` 已回傳新欄位（如 PK `pen1`/`pen2`），前台卻完全不顯示。
+**原因**：同專案存在兩個 `/exec` 部署 URL——舊部署的 `getMatches` 尚未含新欄位（回傳缺 key），而各 HTML 檔散落指向不同 URL（bracket/schedule 指新版、scorers/admin 指舊版）。前端渲染缺失只是其中一半原因，另一半是資料來源本身就沒帶欄位。
+**解法**：除錯「欄位沒顯示」先兵分兩路：①直接 curl 各 `/exec?action=getMatches` 確認該部署有無回傳該 key；②`grep -rl` 比對每個 HTML 打的是哪個 URL。兩者都對齊後，才是純前端 render 問題。本次同時發現 bracket.html 根本沒渲染 PK（schedule.html 有），並修正淘汰賽平手需以 pen 決勝、否則 `score1>score2` 會在決賽 1-1 時誤判 team2 為冠軍。
