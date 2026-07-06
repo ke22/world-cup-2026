@@ -1,7 +1,7 @@
 ## 1. Google Sheet：新增 scorers 工作表
 
 - [ ] 1.1 建立 `scorers` 工作表滿足 GAS scorers sheet stores 2026 individual goal events 規格（決策 3：GAS `scorers` 工作表僅記錄 2026 年進球事件）：在 Google Sheet 新增 `scorers` 工作表，標題列欄位為 `match_id`、`player_name`、`player_code`、`goals`。驗證：開啟 Sheet 可看到四欄標題，且第一列為標題、無資料列。
-- [ ] 1.2 為 `scorers` 工作表加入資料驗證：`match_id` 欄接受正整數、`goals` 欄接受 ≥1 的整數、`player_code` 欄僅接受 `mbappe`、`messi`、`ronaldo` 三個值。驗證：輸入不合規值時 Sheet 顯示警告。
+- [ ] 1.2 為 `scorers` 工作表加入資料驗證：`match_id` 欄接受正整數、`goals` 欄接受 ≥1 的整數、`player_code` 欄僅接受 `mbappe`、`messi`、`ronaldo`、`kane` 四個值（凱恩亦為 active 球員，其 2026 進球需可由 Sheet 更新）。驗證：輸入不合規值時 Sheet 顯示警告，且 `kane` 為合規值。
 
 ## 2. GAS：實作 getTopScorers 端點
 

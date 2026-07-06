@@ -37,6 +37,7 @@ function onOpen() {
       .addSeparator()
       .addItem('建立/刷新比分編輯分頁', 'refreshScoreEditorSheet')
       .addItem('套用比分編輯分頁', 'applyScoreEditorSheet')
+      .addItem('建立/更新 scorers 射手分頁', 'setupScorersSheet')
       .addItem('統一中文譯名', 'normalizeTeamNamesInSheets')
       .addItem('修正 2026 分組字母', 'fixOfficialGroupAssignments2026')
       .addSeparator()
@@ -259,12 +260,13 @@ function setupSheetValidation() {
 function setupHeaders() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
 
-  ss.getSheetByName('matches').getRange(1, 1, 1, 18).setValues([[
+  ss.getSheetByName('matches').getRange(1, 1, 1, 20).setValues([[
     'match_id', 'date', 'time_utc8', 'phase', 'group', 'round',
     'home_code', 'home_name', 'home_flag',
     'away_code', 'away_name', 'away_flag',
     'score_home', 'score_away', 'status',
-    'venue', 'city', 'manual'
+    'venue', 'city', 'manual',
+    'pen_home', 'pen_away'
   ]]);
 
   ss.getSheetByName('groups').getRange(1, 1, 1, 12).setValues([[
@@ -620,7 +622,7 @@ function syncScores() {
     const competitors = comp.competitors || [];
     let home, away;
     competitors.forEach(c => {
-      const info = { code: espnCode_(c.team.abbreviation), score: c.score };
+      const info = { code: espnCode_(c.team.abbreviation), score: c.score, shootout: c.shootoutScore };
       if (c.homeAway === 'home') home = info;
       else                       away = info;
     });
@@ -630,7 +632,10 @@ function syncScores() {
     const status     = espnStatusToMatchStatus_(statusName);
     const scoreHome  = (status !== 'upcoming' && home.score !== null && home.score !== '') ? Number(home.score) : null;
     const scoreAway  = (status !== 'upcoming' && away.score !== null && away.score !== '') ? Number(away.score) : null;
-    const entry = { scoreHome, scoreAway, status };
+    // Penalty shootout: ESPN sends shootoutScore only when a PK shootout occurred.
+    const penHome    = (status === 'finished' && home.shootout !== null && home.shootout !== undefined && home.shootout !== '') ? Number(home.shootout) : null;
+    const penAway    = (status === 'finished' && away.shootout !== null && away.shootout !== undefined && away.shootout !== '') ? Number(away.shootout) : null;
+    const entry = { scoreHome, scoreAway, penHome, penAway, status };
     const d8    = utcToDate8(ev.date);
 
     byTeams[`${home.code}_${away.code}`]           = entry;
@@ -655,8 +660,18 @@ function syncScores() {
     const scoreHome = m.scoreHome !== null ? m.scoreHome : row[12];
     const scoreAway = m.scoreAway !== null ? m.scoreAway : row[13];
 
-    sheet.getRange(i + 2, 13, 1, 3).setValues([[scoreHome, scoreAway, m.status]]);
-    updated++;
+    // Per-row try/catch: a single bad cell (e.g. a stale data-validation rule
+    // rejecting 'live') must not abort the whole sync and strand later rows.
+    try {
+      sheet.getRange(i + 2, 13, 1, 3).setValues([[scoreHome, scoreAway, m.status]]);
+      // Penalty shootout columns (19/20) — only written when ESPN reports a PK result.
+      if (m.penHome !== null && m.penAway !== null) {
+        sheet.getRange(i + 2, 19, 1, 2).setValues([[m.penHome, m.penAway]]);
+      }
+      updated++;
+    } catch (err) {
+      Logger.log(`syncScores: row ${i + 2} (match ${row[0]}) write failed — ${err.message}`);
+    }
   });
 
   Logger.log(`syncScores (ESPN): ${updated} matches updated`);
@@ -785,8 +800,9 @@ function getKnockoutFeed_() {
 
 // Determine winner/loser team cells [code, name, flag] of a finished knockout
 // match row. Returns null when the match is not finished, scores are missing,
-// either team is still TBD, or the score is level (penalties are not stored,
-// so a draw can't be auto-resolved — leave it for a manual override).
+// or either team is still TBD. A level score is resolved by the penalty
+// shootout columns (19/20) when present; if pens are absent or also level the
+// draw can't be auto-resolved, so it's left for a manual override.
 function knockoutOutcome_(row) {
   if (!row || String(row[14]) !== 'finished') return null;
   const s1 = row[12], s2 = row[13];
@@ -796,8 +812,15 @@ function knockoutOutcome_(row) {
   const away = [String(row[9] || ''), String(row[10] || ''), String(row[11] || '')];
   if (!home[0] || !away[0]) return null;
   const n1 = Number(s1), n2 = Number(s2);
-  if (isNaN(n1) || isNaN(n2) || n1 === n2) return null;
-  return n1 > n2 ? { winner: home, loser: away } : { winner: away, loser: home };
+  if (isNaN(n1) || isNaN(n2)) return null;
+  if (n1 !== n2) return n1 > n2 ? { winner: home, loser: away } : { winner: away, loser: home };
+  // Level after regulation/extra time — decide by penalty shootout if recorded.
+  const p1 = row[18], p2 = row[19];
+  if (p1 === '' || p1 === null || p1 === undefined) return null;
+  if (p2 === '' || p2 === null || p2 === undefined) return null;
+  const np1 = Number(p1), np2 = Number(p2);
+  if (isNaN(np1) || isNaN(np2) || np1 === np2) return null;
+  return np1 > np2 ? { winner: home, loser: away } : { winner: away, loser: home };
 }
 
 // Plan the six team cells for a downstream knockout row from its feed entry.
@@ -1227,7 +1250,11 @@ function setupSyncTrigger() {
     .forEach(t => ScriptApp.deleteTrigger(t));
 
   ScriptApp.newTrigger('syncScores').timeBased().everyMinutes(10).create();
-  SpreadsheetApp.getUi().alert('Done — syncScores will run every 10 minutes.');
+  const msg = 'Done — syncScores will run every 10 minutes.';
+  Logger.log(msg);
+  // getUi() only works when bound to the spreadsheet UI; ignore when run from
+  // the script editor or a trigger.
+  try { SpreadsheetApp.getUi().alert(msg); } catch (_) {}
 }
 // ─────────────────────────────────────────────
 
@@ -1242,6 +1269,7 @@ function doGet(e) {
       case 'getConfig':    result = getConfig();                 break;
       case 'updateMatch':  result = updateMatchFromGet(e.parameter); break;
       case 'getTopScorers': result = getTopScorers();               break;
+      case 'getScorerRace': result = getScorerRace();               break;
       default:             result = { status: 'error', message: 'Invalid action' };
     }
   } catch (err) {
@@ -1269,6 +1297,12 @@ function doPost(e) {
       sheet.getRange(i + 1, 14).setValue(Number(d.score2));
     if (d.status)
       sheet.getRange(i + 1, 15).setValue(d.status);
+
+    // Penalty shootout (knockout only). Empty string clears the cell.
+    if (d.pen1 !== undefined)
+      sheet.getRange(i + 1, 19).setValue(d.pen1 === '' ? '' : Number(d.pen1));
+    if (d.pen2 !== undefined)
+      sheet.getRange(i + 1, 20).setValue(d.pen2 === '' ? '' : Number(d.pen2));
 
     sheet.getRange(i + 1, 18).setValue(true);
 
@@ -1301,6 +1335,12 @@ function updateMatchFromGet(p) {
     sheet.getRange(i + 1, 14).setValue(Number(p.score2));
   if (p.status)
     sheet.getRange(i + 1, 15).setValue(p.status);
+
+  // Penalty shootout (knockout only). Empty string clears the cell.
+  if (p.pen1 !== undefined)
+    sheet.getRange(i + 1, 19).setValue(p.pen1 === '' ? '' : Number(p.pen1));
+  if (p.pen2 !== undefined)
+    sheet.getRange(i + 1, 20).setValue(p.pen2 === '' ? '' : Number(p.pen2));
 
   // Knockout team fields
   if (p.team1_code !== undefined) sheet.getRange(i + 1, 7).setValue(p.team1_code);
@@ -1357,7 +1397,9 @@ function getMatches(params) {
       score2: toScore(r[13]),
       status: String(r[14] || 'upcoming'),
       venue:  String(r[15] || ''),
-      city:   String(r[16] || '')
+      city:   String(r[16] || ''),
+      pen1:   toScore(r[18]),
+      pen2:   toScore(r[19])
     }));
 
   if (params.date)  data = data.filter(m => m.date === params.date);
@@ -1422,7 +1464,25 @@ function getGroups(params) {
 
 // ─── getConfig ────────────────────────────────
 
+// Short-lived script cache so repeat loads don't re-read (and re-scan) the
+// spreadsheet on every request. touchDataVersion() clears these keys the moment
+// a score edit happens; the TTL is the backstop for direct hand-edits to the
+// scorers / career tabs, which don't go through touchDataVersion().
+function withScriptCache_(key, ttlSeconds, producer) {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get(key);
+  if (hit) {
+    try { return JSON.parse(hit); } catch (_) {}
+  }
+  const value = producer();
+  try { cache.put(key, JSON.stringify(value), ttlSeconds); } catch (_) {}
+  return value;
+}
+
 function getTopScorers() {
+  return withScriptCache_('top_scorers', 30, computeTopScorers_);
+}
+function computeTopScorers_() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('scorers');
   if (!sheet) return { status: 'ok', updated: getDataVersion(), data: [] };
 
@@ -1447,6 +1507,113 @@ function getTopScorers() {
   return { status: 'ok', updated: getDataVersion(), data: Object.values(byCode) };
 }
 
+// ── Full scorer-career feed for the data-driven race / bars / lines charts ──
+// Reads the rich career tab (one row per player-per-tournament). The tab is
+// located by header signature (`player_id` + `goals_added`) so it works even if
+// the tab is renamed. Rows are grouped by player_id and returned sorted by
+// display_order, each with a career[] sorted by year. The frontend filters to
+// 2026 participants and maps colours/flags locally.
+function getScorerRace() {
+  return withScriptCache_('scorer_race', 30, computeScorerRace_);
+}
+function computeScorerRace_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = null;
+  for (const sh of ss.getSheets()) {
+    const lastCol = sh.getLastColumn();
+    if (lastCol < 2) continue;
+    const hdr = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    if (hdr.indexOf('player_id') >= 0 && hdr.indexOf('goals_added') >= 0) { sheet = sh; break; }
+  }
+  if (!sheet) return { status: 'ok', updated: getDataVersion(), data: [] };
+
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return { status: 'ok', updated: getDataVersion(), data: [] };
+
+  const header = rows[0].map(h => String(h).trim());
+  const col = name => header.indexOf(name);
+  const ci = {
+    id: col('player_id'), zh: col('player_name_zh'), en: col('player_name_en'),
+    cc: col('country_code'), cn: col('country_name_zh'),
+    year: col('year'), ga: col('goals_added'), cum: col('cumulative_goals'),
+    role: col('series_role'), order: col('display_order'), proj: col('is_projected'),
+  };
+
+  const byId = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const id = String(r[ci.id] || '').trim();
+    if (!id) continue;
+    const year = Number(r[ci.year]) || 0;
+    if (!year) continue;
+    if (!byId[id]) {
+      byId[id] = {
+        player_id: id,
+        name_zh: String(r[ci.zh] || ''),
+        name_en: String(r[ci.en] || ''),
+        country_code: String(r[ci.cc] || ''),
+        country_name_zh: String(r[ci.cn] || ''),
+        series_role: ci.role >= 0 ? String(r[ci.role] || '') : '',
+        display_order: ci.order >= 0 ? (Number(r[ci.order]) || 999) : 999,
+        career: [],
+      };
+    }
+    byId[id].career.push({
+      year: year,
+      goals: Number(r[ci.ga]) || 0,
+      cumulative: ci.cum >= 0 ? (Number(r[ci.cum]) || 0) : 0,
+      is_projected: ci.proj >= 0 ? String(r[ci.proj]).toUpperCase() === 'TRUE' : false,
+    });
+  }
+
+  const data = Object.values(byId);
+  data.forEach(p => p.career.sort((a, b) => a.year - b.year));
+  data.sort((a, b) => a.display_order - b.display_order);
+  return { status: 'ok', updated: getDataVersion(), data: data };
+}
+
+// Create or refresh the `scorers` tab that getTopScorers() reads for live 2026
+// goals. Header: match_id, player_name, player_code, goals — one row per
+// player-per-match goal tally. Existing data rows are preserved; only the
+// header, formatting and validation are (re)applied. player_code is limited to
+// the four active players whose 2026 goals merge into wc2026-scorers.html.
+function setupScorersSheet(showAlert) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const headers = ['match_id', 'player_name', 'player_code', 'goals'];
+  let sheet = ss.getSheetByName('scorers');
+  if (!sheet) sheet = ss.insertSheet('scorers');
+
+  sheet.getRange(1, 1, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#0f4b8f')
+    .setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+
+  const n = Math.max(sheet.getMaxRows() - 1, 1);
+  const posInt = SpreadsheetApp.newDataValidation()
+    .requireNumberGreaterThan(0).setAllowInvalid(false)
+    .setHelpText('正整數').build();
+  const goalsRule = SpreadsheetApp.newDataValidation()
+    .requireNumberGreaterThanOrEqualTo(1).setAllowInvalid(false)
+    .setHelpText('整數，至少 1').build();
+  const codeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['mbappe', 'messi', 'ronaldo', 'kane'], true).setAllowInvalid(false).build();
+
+  sheet.getRange(2, 1, n, 1).setDataValidation(posInt);    // match_id
+  sheet.getRange(2, 3, n, 1).setDataValidation(codeRule);  // player_code
+  sheet.getRange(2, 4, n, 1).setDataValidation(goalsRule); // goals
+
+  sheet.autoResizeColumns(1, headers.length);
+  sheet.setColumnWidth(2, 160); // player_name
+
+  const msg = 'scorers 射手分頁已建立／更新。欄位：match_id, player_name, player_code, goals。' +
+    'player_code 僅允許 mbappe / messi / ronaldo / kane，每列一名球員在一場比賽的進球數。';
+  Logger.log(msg);
+  try { SpreadsheetApp.getUi().alert(msg); } catch (_) {}
+  return sheet;
+}
+
 function getConfig() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('config');
   const rows  = sheet.getDataRange().getValues();
@@ -1466,7 +1633,7 @@ function touchDataVersion() {
   const updated = new Date().toISOString();
   PropertiesService.getScriptProperties().setProperty('DATA_UPDATED_AT', updated);
   const cache = CacheService.getScriptCache();
-  ['matches_all', 'groups_all', 'config_all'].forEach(key => cache.remove(key));
+  ['matches_all', 'groups_all', 'config_all', 'top_scorers', 'scorer_race'].forEach(key => cache.remove(key));
   SpreadsheetApp.flush();
   return updated;
 }

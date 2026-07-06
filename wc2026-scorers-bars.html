@@ -126,9 +126,8 @@ body {
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
-const CACHE_KEY = 'wc26_scorers';
+const RACE_CACHE_KEY = 'wc26_race';
 const CACHE_TTL = 60; // seconds
-const LS_KEY = 'wc26_scorers_v1';
 
 // ── 11 players who participate in the 2026 World Cup ──
 // career omits non-participation years; 2026 goals are static fallbacks that the
@@ -142,7 +141,7 @@ const PLAYERS = {
   mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
     { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
   ]},
-  cronaldo: { name: 'C羅納度',   flag: '🇵🇹', country: 'POR', color: '#2E7D32', career: [
+  cronaldo: { name: '羅納度',    flag: '🇵🇹', country: 'POR', color: '#2E7D32', career: [
     { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
     { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 2 },
   ]},
@@ -172,17 +171,28 @@ const PLAYERS = {
   ]},
 };
 
-// ── GAS player_code → internal key aliases ──
-// The live merge only fires when the feed's player_code resolves to one of the
-// PLAYERS keys above. Most internal keys already match the likely feed codes
-// directly (neymar, lukaku, gakpo, vinicius, valencia, perisic). Only codes that
-// differ need an entry here. Players whose feed code we cannot confirm fall back
-// to their static 2026 value above (no error).
-const ALIASES = {
-  'ronaldo': 'cronaldo',          // feed uses 'ronaldo' for C. Ronaldo
-  'james_rodriguez': 'james',     // assumed; falls back to static if unmatched
-  'james': 'james',
-  'enner_valencia': 'valencia',   // assumed; falls back to static if unmatched
+// ── Presentation meta keyed by player_id from getScorerRace ──
+// Colours and flags live in code (not in the sheet); name falls back to the
+// sheet's player_name_zh unless overridden here. To add a player: add rows to
+// the sheet's career tab AND a line here for its colour/flag.
+const META = {
+  'lionel-messi':      { color: '#1565C0', flag: '🇦🇷' },
+  'kylian-mbappe':     { color: '#D32F2F', flag: '🇫🇷' },
+  'cristiano-ronaldo': { color: '#2E7D32', flag: '🇵🇹', name: '羅納度' },
+  'harry-kane':        { color: '#7B1FA2', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+  'neymar':            { color: '#FB8C00', flag: '🇧🇷' },
+  'enner-valencia':    { color: '#AD1457', flag: '🇪🇨' },
+  'james-rodriguez':   { color: '#6D4C41', flag: '🇨🇴' },
+  'romelu-lukaku':     { color: '#EC407A', flag: '🇧🇪' },
+  'ivan-perisic':      { color: '#3949AB', flag: '🇭🇷' },
+  'cody-gakpo':        { color: '#00897B', flag: '🇳🇱' },
+  'vinicius-junior':   { color: '#00BCD4', flag: '🇧🇷' },
+  'erling-haaland':    { color: '#F9A825', flag: '🇳🇴' },
+};
+// Fallback flag by country_code when a player_id isn't in META above
+const FLAG_BY_CC = {
+  ARG:'🇦🇷', FRA:'🇫🇷', POR:'🇵🇹', ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', BRA:'🇧🇷',
+  ECU:'🇪🇨', COL:'🇨🇴', BEL:'🇧🇪', CRO:'🇭🇷', NED:'🇳🇱', NOR:'🇳🇴',
 };
 
 // ── Tournament segment buckets (older → newer; 2026 darkest to emphasise live) ──
@@ -209,36 +219,33 @@ function cacheSet(key, data) {
   try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
 
-// ── Fetch live 2026 data ──
-async function fetchTopScorers() {
-  const hit = cacheGet(CACHE_KEY);
+// ── Fetch full scorer-career data from GAS ──
+async function fetchScorerRace() {
+  const hit = cacheGet(RACE_CACHE_KEY);
   if (hit) return hit;
-  const url = GAS_URL + '?action=getTopScorers';
-  const res = await fetch(url);
+  const res = await fetch(GAS_URL + '?action=getScorerRace');
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json.status !== 'ok') throw new Error(json.message || 'API error');
-  cacheSet(CACHE_KEY, json.data);
+  cacheSet(RACE_CACHE_KEY, json.data);
   return json.data;
 }
 
-// ── Merge live 2026 goals into a deep copy of PLAYERS ──
-function mergePlayerData(base, live2026) {
-  const merged = {};
-  for (const [code, p] of Object.entries(base)) {
-    merged[code] = { ...p, career: p.career.map(t => ({ ...t })) };
+// ── Convert getScorerRace rows → PLAYERS shape, keeping only 2026 participants ──
+function buildFromRace(raceData) {
+  const out = {};
+  for (const p of raceData) {
+    if (!p.career.some(c => c.year === 2026)) continue;   // 2026 participants only
+    const m = META[p.player_id] || {};
+    out[p.player_id] = {
+      name: m.name || p.name_zh,
+      flag: m.flag || FLAG_BY_CC[p.country_code] || '🏳️',
+      color: m.color || '#90a4ae',
+      country: p.country_code,
+      career: p.career.map(c => ({ wc: c.year, goals: c.goals })),
+    };
   }
-  for (const lp of live2026) {
-    const code = ALIASES[lp.player_code] || lp.player_code;
-    if (!merged[code]) continue;
-    if (lp.matches_played_2026 > 0) {
-      const entry = { wc: 2026, goals: lp.total_goals_2026 };
-      const idx = merged[code].career.findIndex(t => t.wc === 2026);
-      if (idx >= 0) merged[code].career[idx] = entry;
-      else merged[code].career.push(entry);
-    }
-  }
-  return merged;
+  return out;
 }
 
 // ── Derived helpers ──
@@ -407,26 +414,20 @@ function render(playerData) {
 }
 
 // ── Main ──
-async function main() {
-  let rendered = false;
-  try {
-    const cached = localStorage.getItem(LS_KEY);
-    if (cached) {
-      render(mergePlayerData(PLAYERS, JSON.parse(cached)));
-      rendered = true;
-    }
-  } catch {}
-
-  try {
-    const live2026 = await fetchTopScorers();
-    try { localStorage.setItem(LS_KEY, JSON.stringify(live2026)); } catch {}
-    render(mergePlayerData(PLAYERS, live2026));
-    rendered = true;
-  } catch (e) {
-    if (!rendered) render(PLAYERS);
-  }
-
+function postHeight() {
   window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
+}
+async function main() {
+  // Paint the hardcoded fallback immediately so the chart never sits blank while
+  // the GAS request is in flight; swap in live data the moment it arrives.
+  render(PLAYERS);
+  postHeight();
+  try {
+    const built = buildFromRace(await fetchScorerRace());
+    if (Object.keys(built).length) { render(built); postHeight(); }
+  } catch (e) {
+    // GAS unavailable — keep the fallback already on screen
+  }
 }
 
 main();
