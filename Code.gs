@@ -1529,14 +1529,17 @@ const BOARD_HEADERS = ['player_code', 'player_name', 'country_code']
   .concat(['assists', 'minutes', 'eliminated', 'manual']);
 
 function getScorerBoard() {
-  return withScriptCache_('scorer_board', 30, computeScorerBoard_);
+  return withScriptCache_('scorer_board', 60, computeScorerBoard_);
 }
 function computeScorerBoard_() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('scorer_board');
   if (!sheet) return { status: 'ok', updated: getDataVersion(), data: [] };
 
-  const rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return { status: 'ok', updated: getDataVersion(), data: [] };
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow <= 1 || lastCol === 0) return { status: 'ok', updated: getDataVersion(), data: [] };
+
+  const rows = sheet.getRange(1, 1, lastRow, lastCol).getValues();
 
   const header = rows[0].map(h => String(h).trim());
   const col = name => header.indexOf(name);
@@ -1577,9 +1580,9 @@ function computeScorerBoard_() {
 // the tab is renamed. Rows are grouped by player_id and returned sorted by
 // display_order, each with a career[] sorted by year. The frontend filters to
 // 2026 participants and maps colours/flags locally.
-// Cache: 60 seconds to reduce table queries while keeping data fresh for live updates.
+// Cache: 120 seconds to reduce table queries while keeping data fresh for live updates.
 function getScorerRace() {
-  return withScriptCache_('scorer_race', 60, computeScorerRace_);
+  return withScriptCache_('scorer_race', 120, computeScorerRace_);
 }
 function computeScorerRace_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
