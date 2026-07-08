@@ -157,7 +157,7 @@ footer {
     <img src="cna_logo.svg" class="page-header-logo" alt="CNA">
     <div class="page-header-text">
       <h1>FIFA 世界杯 2026 — 互動圖表嵌入代碼</h1>
-      <p>供 CNA 記者 / 編輯複製貼上使用 · 更新日期：2026-06-04</p>
+      <p>供 CNA 記者 / 編輯複製貼上使用 · 更新日期：2026-06-30</p>
     </div>
   </header>
 
@@ -252,6 +252,48 @@ footer {
     </div>
   </div>
 
+  <!-- ── 2026 射手競賽（折線版）── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>📈 2026 射手競賽（折線版）</h2>
+      <span class="tag">wc2026-scorers-lines.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>500px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-scorers-lines">
+        <button class="copy-btn" onclick="copyCode('code-scorers-lines', this)">複製</button>
+        <pre id="pre-scorers-lines"></pre>
+      </div>
+      <p class="note">僅列 2026 參賽且累計進球 5 球以上的 11 位球員；累計折線，點選／滑過名字或線條可聚焦該球員。資料由 Google Sheet 生涯分頁即時提供。</p>
+    </div>
+  </div>
+
+  <!-- ── 2026 射手榜（長條版）── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>📊 2026 射手榜（長條版）</h2>
+      <span class="tag">wc2026-scorers-bars.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>480px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-scorers-bars">
+        <button class="copy-btn" onclick="copyCode('code-scorers-bars', this)">複製</button>
+        <pre id="pre-scorers-bars"></pre>
+      </div>
+      <p class="note">水平堆疊長條，依生涯總進球排序、分屆著色；長條總長＝該球員世界盃生涯總進球。</p>
+    </div>
+  </div>
+
   <!-- ── postMessage 說明 ── -->
   <div class="postmsg-note">
     <strong>⚡ 自動高度調整說明</strong><br>
@@ -272,6 +314,8 @@ const CHARTS = [
   { id: 'groups',   file: 'wc2026-groups.html',   title: '世界盃小組積分',   height: 430 },
   { id: 'bracket',  file: 'wc2026-bracket.html',  title: '世界盃淘汰賽賽程樹', height: 800 },
   { id: 'scorers',  file: 'wc2026-scorers.html',  title: '世界盃歷史射手競賽', height: 500 },
+  { id: 'scorers-lines', file: 'wc2026-scorers-lines.html', title: '2026 世界盃射手競賽（折線）', height: 500 },
+  { id: 'scorers-bars',  file: 'wc2026-scorers-bars.html',  title: '2026 世界盃射手榜（長條）',   height: 480 },
 ];
 
 function buildCode(baseUrl, chart) {

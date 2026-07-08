@@ -120,7 +120,7 @@ body {
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
 const CACHE_KEY = 'wc26_scorers';
 const CACHE_TTL = 60; // seconds
 
@@ -129,18 +129,18 @@ const CACHE_TTL = 60; // seconds
 // active: false → muted grey reference line (1.5px, opacity 0.6)
 const HISTORICAL_DATA = {
   mbappe:    { name: '姆巴佩',     flag: '🇫🇷', color: '#D32F2F', active: true,  career: [
-    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 4 },
+    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 6 },
   ]},
   messi:     { name: '梅西',       flag: '🇦🇷', color: '#1565C0', active: true,  career: [
     { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
-    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 5 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 6 },
   ]},
   cronaldo:  { name: 'C羅納度',    flag: '🇵🇹', color: '#2E7D32', active: true,  career: [
     { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
-    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 2 },
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 3 },
   ]},
   kane:      { name: '凱恩',       flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: '#7B1FA2', active: true,  career: [
-    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 2 },
+    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 5 },
   ]},
   klose:     { name: '克洛澤',     flag: '🇩🇪', color: '#b0b8c1', active: false, career: [
     { wc: 2002, goals: 5 }, { wc: 2006, goals: 5 }, { wc: 2010, goals: 4 }, { wc: 2014, goals: 2 },
@@ -321,6 +321,42 @@ function txt(str, attrs, parent) {
   return el;
 }
 
+// ── Flag helpers ──
+// Emoji flags don't render inside SVG <text> on many systems (esp. the
+// England subdivision flag 🏴). Mirror the groups page approach: draw the
+// twemoji SVG from the local emoji/ folder as an <image>.
+function emojiToCodePoint(emoji) {
+  const pts = [];
+  for (const ch of emoji) {
+    const cp = ch.codePointAt(0).toString(16);
+    if (cp !== 'fe0f') pts.push(cp);  // drop variation selector, keep ZWJ/tags
+  }
+  return pts.join('-');
+}
+function flagHref(emoji) { return `emoji/${emojiToCodePoint(emoji)}.svg`; }
+
+// Rough text-width estimate for centring a flag + label together
+function estTextWidth(str, fs) {
+  let w = 0;
+  for (const ch of str) w += (ch.codePointAt(0) > 0x2e80 ? fs : fs * 0.55);
+  return w;
+}
+
+// Draw a flag image followed by a text label, as one visual unit.
+// anchor 'start' → left edge at x; anchor 'middle' → centred on x.
+function drawLabel(parent, x, y, anchor, flagEmoji, label, textAttrs) {
+  const fs   = parseFloat(textAttrs['font-size']) || 12;
+  const flagW = fs * 1.3, flagH = fs * 1.3, gap = fs * 0.35;
+  const textW = estTextWidth(label, fs);
+  const total = flagW + gap + textW;
+  const startX = anchor === 'middle' ? x - total / 2 : x;
+  mk('image', {
+    href: flagHref(flagEmoji), x: f(startX), y: f(y - flagH * 0.82),
+    width: f(flagW), height: f(flagH),
+  }, parent);
+  txt(label, { ...textAttrs, x: f(startX + flagW + gap), y: f(y), 'text-anchor': 'start' }, parent);
+}
+
 // ── Render ──
 function render(playerData) {
   const svg = document.getElementById('chart');
@@ -339,7 +375,7 @@ function render(playerData) {
       stroke: g === 0 ? 'rgba(15,50,96,0.2)' : 'rgba(15,50,96,0.06)',
       'stroke-width': g === 0 ? 1.2 : 0.7,
     }, gridG);
-    if (g % 4 === 0) {
+    if (g > 0 && g % 2 === 0) {
       txt(String(g), {
         x: ML - 6, y: f(y + 4),
         'text-anchor': 'end', fill: '#94a3b8', 'font-size': '10.5',
@@ -357,8 +393,13 @@ function render(playerData) {
   }, gridG);
 
   // ── X-axis (WC years) ──
+  // Ticks/gridlines stay on the year positions (the step plateaus' corners),
+  // but each year label is centred in the gap to the next year so it sits
+  // under that tournament's dot (which floats at the plateau midpoint).
+  // The last year has no following plateau, so its label stays on its tick.
   const axG = mk('g', {}, svg);
-  for (const year of WC_YEARS) {
+  for (let i = 0; i < WC_YEARS.length; i++) {
+    const year = WC_YEARS[i];
     const x = cx_year(year);
     // faint vertical guideline
     mk('line', { x1:f(x), y1:MT, x2:f(x), y2:MT+PH,
@@ -366,12 +407,16 @@ function render(playerData) {
     // tick
     mk('line', { x1:f(x), y1:MT+PH, x2:f(x), y2:MT+PH+5,
       stroke:'#cbd5e1', 'stroke-width':0.8 }, axG);
-    // year label, rotated so 4-digit numbers don't collide
-    const labelY = MT + PH + 14;
-    const labelEl = txt(String(year), {
-      x: f(x), y: labelY,
-      'text-anchor': 'end', fill: '#94a3b8', 'font-size': '9.5',
-      transform: `rotate(-40 ${f(x)} ${labelY})`,
+    // year label — centred under the dot (midpoint to next year). The last year
+    // gets the same half-step shift to the right so spacing stays even.
+    const labelX = i < WC_YEARS.length - 1
+      ? (x + cx_year(WC_YEARS[i + 1])) / 2
+      : x + (x - cx_year(WC_YEARS[i - 1])) / 2;
+    const labelY = MT + PH + 16;
+    txt(String(year), {
+      x: f(labelX), y: labelY,
+      'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '9.5',
+      'font-variant-numeric': 'tabular-nums',
     }, axG);
   }
 
@@ -432,7 +477,7 @@ function render(playerData) {
       const t   = p.career[0];
       const px  = f(cx_year(t.wc));
       const py  = f(cy(t.goals));
-      const dot = { wx: t.wc, nextWx: null, isMid: false, year: t.wc,
+      const dot = { wx: t.wc, year: t.wc,
                     cumGoals: t.goals, tourGoals: t.goals, isCareerStart: false };
       mk('circle', { cx: px, cy: py, r: haloR, fill: '#fff' }, pDotG);
       mk('circle', { cx: px, cy: py, r: dotR,  fill: p.color, opacity: op }, pDotG);
@@ -442,13 +487,11 @@ function render(playerData) {
       hit.addEventListener('mouseleave', () => { restoreAll(); ttHide(); });
       hit.addEventListener('touchstart', e => { e.preventDefault(); dimOthers(code); ttShow(e, dot, p.name, p.color); }, { passive: false });
       hit.addEventListener('touchend',   () => { restoreAll(); ttHide(); });
-      txt(`${p.flag} ${p.name}  ${t.goals}`, {
-        x: f(cx_year(t.wc)), y: f(cy(t.goals) - 10),
-        'text-anchor': 'middle', fill: '#64748b',
-        'font-size': '11.5', 'font-weight': '400',
+      drawLabel(pLblG, cx_year(t.wc), cy(t.goals) - 10, 'middle', p.flag, `${p.name}  ${t.goals}`, {
+        fill: '#64748b', 'font-size': '11.5', 'font-weight': '400',
         stroke: 'rgba(255,255,255,0.92)', 'stroke-width': '3',
         'stroke-linejoin': 'round', 'paint-order': 'stroke fill',
-      }, pLblG);
+      });
       continue;
     }
 
@@ -503,19 +546,17 @@ function render(playerData) {
 
     // ── End label: retired multi-WC players ──
     if (!p.active) {
-      txt(`${p.flag} ${p.name}  ${p.endY}`, {
-        x: f(cx_year(p.endWC)), y: f(cy(p.endY) - 10),
-        'text-anchor': 'middle', fill: '#64748b',
-        'font-size': '11.5', 'font-weight': '400',
+      drawLabel(pLblG, cx_year(p.endWC), cy(p.endY) - 10, 'middle', p.flag, `${p.name}  ${p.endY}`, {
+        fill: '#64748b', 'font-size': '11.5', 'font-weight': '400',
         stroke: 'rgba(255,255,255,0.92)', 'stroke-width': '3',
         'stroke-linejoin': 'round', 'paint-order': 'stroke fill',
-      }, pLblG);
+      });
     }
 
     // ── End label: active players (collision-resolved after loop) ──
     if (p.active) {
       endLabels.push({ code, x: cx_year(p.endWC) + 8, y: cy(p.endY) + 4,
-                       text: `${p.flag} ${p.name}  ${p.endY}`, color: p.color });
+                       flag: p.flag, text: `${p.name}  ${p.endY}`, color: p.color });
     }
   }
 
@@ -528,13 +569,11 @@ function render(playerData) {
   }
   for (const lbl of endLabels) {
     const pg = allGroups.find(g => g.code === lbl.code);
-    txt(lbl.text, {
-      x: f(lbl.x), y: f(lbl.y),
-      'text-anchor': 'start', fill: lbl.color,
-      'font-size': '14', 'font-weight': '700',
+    drawLabel(pg.pLblG, lbl.x, lbl.y, 'start', lbl.flag, lbl.text, {
+      fill: lbl.color, 'font-size': '14', 'font-weight': '700',
       stroke: 'rgba(255,255,255,0.92)', 'stroke-width': '4',
       'stroke-linejoin': 'round', 'paint-order': 'stroke fill',
-    }, pg.pLblG);
+    });
   }
 }
 

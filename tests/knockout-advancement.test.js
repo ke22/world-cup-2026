@@ -29,9 +29,9 @@ const { getKnockoutFeed_, knockoutOutcome_, planKnockoutRowUpdate_ } =
   load(['getKnockoutFeed_', 'knockoutOutcome_', 'planKnockoutRowUpdate_']);
 
 // matches-sheet row layout (0-based): 6/7/8 home code/name/flag,
-// 9/10/11 away, 12/13 scores, 14 status, 17 manual lock.
+// 9/10/11 away, 12/13 scores, 14 status, 17 manual lock, 18/19 PK shootout.
 function row(id, opts = {}) {
-  const r = new Array(18).fill('');
+  const r = new Array(20).fill('');
   r[0] = id;
   r[6] = opts.hc || ''; r[7] = opts.hn || ''; r[8] = opts.hf || '';
   r[9] = opts.ac || ''; r[10] = opts.an || ''; r[11] = opts.af || '';
@@ -39,6 +39,8 @@ function row(id, opts = {}) {
   r[13] = opts.s2 === undefined ? '' : opts.s2;
   r[14] = opts.status || 'upcoming';
   r[17] = opts.manual || '';
+  r[18] = opts.p1 === undefined ? '' : opts.p1;
+  r[19] = opts.p2 === undefined ? '' : opts.p2;
   return r;
 }
 
@@ -49,7 +51,9 @@ function row(id, opts = {}) {
     [89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104],
     'feed covers every downstream knockout match 89-104');
 
-  // R32→R16 (verified by venue)
+  // R32→R16 (official FIFA bracket; verified against live data + Sky Sports
+  // real-team bracket: 89 = Canada(W73) vs W(Netherlands/Morocco=W76),
+  // 90 = W75(Germany/Paraguay) vs W78(France/Sweden), 91 = Brazil(W74) vs W77)
   const r16 = { 89: [73, 76], 90: [75, 78], 91: [74, 77], 92: [79, 80],
                 93: [84, 83], 94: [82, 81], 95: [87, 86], 96: [85, 88] };
   for (const [id, [h, a]] of Object.entries(r16)) {
@@ -57,13 +61,23 @@ function row(id, opts = {}) {
     assert.strictEqual(feed[id].away.match, a, `R16 ${id} away feeder`);
     assert.strictEqual(feed[id].home.take, 'W');
   }
-  // QF/SF/Final winners + 3rd place from SF losers
-  assert.deepStrictEqual([feed[97].home.match, feed[97].away.match], [89, 90]);
-  assert.deepStrictEqual([feed[101].home.match, feed[101].away.match], [97, 98]);
-  assert.deepStrictEqual([feed[104].home.match, feed[104].away.match], [101, 102]);
+  // QF/SF/Final winners (full tree) + 3rd place from SF losers
+  const qfsf = { 97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96],
+                 101: [97, 98], 102: [99, 100], 104: [101, 102] };
+  for (const [id, [h, a]] of Object.entries(qfsf)) {
+    assert.deepStrictEqual([feed[id].home.match, feed[id].away.match], [h, a], `feed ${id}`);
+    assert.strictEqual(feed[id].home.take, 'W', `feed ${id} takes winners`);
+  }
   assert.strictEqual(feed[103].home.take, 'L');
   assert.strictEqual(feed[103].away.take, 'L');
   assert.deepStrictEqual([feed[103].home.match, feed[103].away.match], [101, 102]);
+
+  // Left half (→SF101) and right half (→SF102) must partition the 16 R32 matches
+  // with no overlap — guards against an R16 feed change that crosses the halves.
+  const reach = id => { const o = []; (function r(m){ const e = feed[m]; if (!e) { o.push(m); return; } r(e.home.match); r(e.away.match); })(id); return o.sort((x, y) => x - y); };
+  const left = reach(101), right = reach(102);
+  assert.deepStrictEqual(left,  [73, 75, 76, 78, 81, 82, 83, 84], 'SF101 left-half R32 set');
+  assert.deepStrictEqual(right, [74, 77, 79, 80, 85, 86, 87, 88], 'SF102 right-half R32 set');
   console.log('  ✓ feed tree matches official bracket (R32→R16→QF→SF→Final + 3rd)');
 }
 
@@ -78,6 +92,14 @@ function row(id, opts = {}) {
   assert.strictEqual(knockoutOutcome_(awayWin).winner[0], 'JPN', 'higher away score wins');
 
   assert.strictEqual(knockoutOutcome_(row(73, { hc: 'BRA', ac: 'JPN', s1: 1, s2: 1, status: 'finished' })), null, 'level score → null (no penalty data)');
+
+  // Level score resolved by penalty shootout
+  const penHome = row(73, { hc: 'BRA', hn: '巴西', hf: 'F1', ac: 'JPN', an: '日本', af: 'F2', s1: 1, s2: 1, p1: 4, p2: 2, status: 'finished' });
+  assert.strictEqual(knockoutOutcome_(penHome).winner[0], 'BRA', 'level score, home wins PK');
+  const penAway = row(73, { hc: 'BRA', ac: 'JPN', s1: 1, s2: 1, p1: 2, p2: 4, status: 'finished' });
+  assert.strictEqual(knockoutOutcome_(penAway).winner[0], 'JPN', 'level score, away wins PK');
+  assert.strictEqual(knockoutOutcome_(row(73, { hc: 'BRA', ac: 'JPN', s1: 1, s2: 1, p1: 3, p2: 3, status: 'finished' })), null, 'level score + level PK → null');
+
   assert.strictEqual(knockoutOutcome_(row(73, { hc: 'BRA', ac: 'JPN', s1: 2, s2: 1, status: 'live' })), null, 'unfinished → null');
   assert.strictEqual(knockoutOutcome_(row(73, { hc: 'BRA', ac: 'JPN', status: 'finished' })), null, 'missing scores → null');
   assert.strictEqual(knockoutOutcome_(row(89, { hc: '', ac: '', status: 'finished', s1: 2, s2: 1 })), null, 'TBD teams → null');
@@ -125,8 +147,6 @@ function row(id, opts = {}) {
     73: { row: fin(73, 'RSA', 'CAN', 0, 2) }, 76: { row: fin(76, 'NED', 'MAR', 3, 1) },
     75: { row: fin(75, 'GER', 'PAR', 2, 0) }, 78: { row: fin(78, 'FRA', 'SWE', 1, 0) },
   };
-  // advance R16
-  rowById[89] = { row: Object.assign(row(89), { _u: planKnockoutRowUpdate_(row(89), feed[89], rowById) }) };
   const r89cells = planKnockoutRowUpdate_(row(89), feed[89], rowById); // CAN vs NED
   const r90cells = planKnockoutRowUpdate_(row(90), feed[90], rowById); // GER vs FRA
   // play R16: CAN beats NED, GER beats FRA → QF #97 = CAN vs GER

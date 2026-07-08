@@ -299,7 +299,7 @@ body {
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzTXDTFpW0fOum8qrm2s0mYmWoGoXPy_g4smEG4rU8j4HQhgJibrNKPvcdvfbIUvUnwMA/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
 const BASE    = 'https://www.cna.com.tw/missions/embed/wc2026';
 
 const PREVIEW_SRCS = {
@@ -393,6 +393,8 @@ function renderMatches() {
     const f2 = m.team2.flag || '';
     const s1 = m.score1 !== null ? m.score1 : '';
     const s2 = m.score2 !== null ? m.score2 : '';
+    const p1 = (m.pen1 !== null && m.pen1 !== undefined) ? m.pen1 : '';
+    const p2 = (m.pen2 !== null && m.pen2 !== undefined) ? m.pen2 : '';
     const meta = [m.time_utc8 ? m.time_utc8 + ' 台灣時間' : '',
                   m.group ? m.group + '組' : m.phase || '',
                   m.venue || '', m.city || ''].filter(Boolean).join(' · ');
@@ -408,6 +410,14 @@ function renderMatches() {
           <span class="ko-team-label">客隊</span>
           <input class="ko-team-input" id="kn2-${m.match_id}"
             value="${m.team2.name || ''}" list="teams-list" placeholder="輸入客隊名…" autocomplete="off">
+        </div>
+        <div class="ko-team-row">
+          <span class="ko-team-label">PK 罰球</span>
+          <input class="score-input" type="number" min="0" max="30" value="${p1}"
+            id="pk1-${m.match_id}" placeholder="–">
+          <span class="score-sep">:</span>
+          <input class="score-input" type="number" min="0" max="30" value="${p2}"
+            id="pk2-${m.match_id}" placeholder="–">
         </div>
       </div>` : '';
     return `
@@ -483,6 +493,13 @@ async function saveMatch(matchId) {
       params.set('team2_name', n2); params.set('team2_flag', t2.flag || ''); params.set('team2_code', t2.code || '');
     }
 
+    // PK shootout fields (knockout only). Always sent so clearing works.
+    const pk1El = document.getElementById(`pk1-${matchId}`);
+    const pk2El = document.getElementById(`pk2-${matchId}`);
+    const pk1 = pk1El ? pk1El.value : '';
+    const pk2 = pk2El ? pk2El.value : '';
+    if (pk1El) { params.set('pen1', pk1); params.set('pen2', pk2); }
+
     params.set('_', Date.now());
     const res = await fetch(`${GAS_URL}?${params}`);
     const json = await res.json();
@@ -493,6 +510,7 @@ async function saveMatch(matchId) {
     if (m) {
       if (s1 !== '') m.score1 = Number(s1);
       if (s2 !== '') m.score2 = Number(s2);
+      if (pk1El) { m.pen1 = pk1 === '' ? null : Number(pk1); m.pen2 = pk2 === '' ? null : Number(pk2); }
       m.status = st;
       if (kn1El) {
         const n1 = kn1El.value.trim(), n2 = kn2El.value.trim();
