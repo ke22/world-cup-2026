@@ -38,6 +38,9 @@ function onOpen() {
       .addItem('建立/刷新比分編輯分頁', 'refreshScoreEditorSheet')
       .addItem('套用比分編輯分頁', 'applyScoreEditorSheet')
       .addItem('建立/更新 scorers 射手分頁', 'setupScorersSheet')
+      .addItem('建立/更新 scorer_board 逐輪射手管理頁', 'setupScorerBoardSheet')
+      .addItem('匯入 API-Football 射手資料', 'importFromApiFootball')
+      .addItem('安裝 API-Football 定時匯入', 'installApiFootballTrigger')
       .addItem('統一中文譯名', 'normalizeTeamNamesInSheets')
       .addItem('修正 2026 分組字母', 'fixOfficialGroupAssignments2026')
       .addSeparator()
@@ -1269,6 +1272,7 @@ function doGet(e) {
       case 'getConfig':    result = getConfig();                 break;
       case 'updateMatch':  result = updateMatchFromGet(e.parameter); break;
       case 'getTopScorers': result = getTopScorers();               break;
+      case 'getScorerBoard': result = getScorerBoard();             break;
       case 'getScorerRace': result = getScorerRace();               break;
       default:             result = { status: 'error', message: 'Invalid action' };
     }
@@ -1507,14 +1511,75 @@ function computeTopScorers_() {
   return { status: 'ok', updated: getDataVersion(), data: Object.values(byCode) };
 }
 
+// ── Consolidated scorer board (design: single-tab management for the rounds
+// chart) ──────────────────────────────────────────────────────────────────
+// One tab, one row per player, goals entered per ROUND directly — no match_id
+// join, no second summary tab. This is the single source of truth for the
+// rounds chart: per-round goals + assists + minutes + country + a manual lock.
+// Header: player_code, player_name, country_code, <8 round labels>, assists,
+// minutes, eliminated, manual. `eliminated` (checkbox) greys the player's line
+// and marks the table row as knocked out.
+const BOARD_ROUNDS = [
+  { key: 'gs1', label: '小組賽M1' }, { key: 'gs2', label: '小組賽M2' }, { key: 'gs3', label: '小組賽M3' },
+  { key: 'r32', label: '32強' }, { key: 'r16', label: '16強' }, { key: 'r8', label: '8強' },
+  { key: 'r4',  label: '4強' }, { key: 'final', label: '決賽' },
+];
+const BOARD_HEADERS = ['player_code', 'player_name', 'country_code']
+  .concat(BOARD_ROUNDS.map(r => r.label))
+  .concat(['assists', 'minutes', 'eliminated', 'manual']);
+
+function getScorerBoard() {
+  return withScriptCache_('scorer_board', 30, computeScorerBoard_);
+}
+function computeScorerBoard_() {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('scorer_board');
+  if (!sheet) return { status: 'ok', updated: getDataVersion(), data: [] };
+
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return { status: 'ok', updated: getDataVersion(), data: [] };
+
+  const header = rows[0].map(h => String(h).trim());
+  const col = name => header.indexOf(name);
+  const ci = { code: col('player_code'), name: col('player_name'), cc: col('country_code'),
+               assists: col('assists'), minutes: col('minutes'), elim: col('eliminated') };
+  if (ci.code < 0) return { status: 'ok', updated: getDataVersion(), data: [] };
+  const roundCols = BOARD_ROUNDS.map(r => ({ key: r.key, idx: col(r.label) }));
+
+  const data = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const code = String(r[ci.code] || '').trim();
+    if (!code) continue;
+    const rounds = {};
+    let total = 0;
+    for (const rc of roundCols) {
+      if (rc.idx < 0) continue;
+      const g = Number(r[rc.idx]) || 0;
+      if (g > 0) { rounds[rc.key] = g; total += g; }
+    }
+    data.push({
+      player_code: code,
+      player_name: ci.name >= 0 ? String(r[ci.name] || '') : '',
+      country_code: ci.cc >= 0 ? String(r[ci.cc] || '').trim() : '',
+      rounds,
+      total_goals_2026: total,
+      assists: ci.assists >= 0 ? (Number(r[ci.assists]) || 0) : 0,
+      minutes: ci.minutes >= 0 ? (Number(r[ci.minutes]) || 0) : 0,
+      eliminated: ci.elim >= 0 ? (r[ci.elim] === true || String(r[ci.elim]).toUpperCase() === 'TRUE') : false,
+    });
+  }
+  return { status: 'ok', updated: getDataVersion(), data: data };
+}
+
 // ── Full scorer-career feed for the data-driven race / bars / lines charts ──
 // Reads the rich career tab (one row per player-per-tournament). The tab is
 // located by header signature (`player_id` + `goals_added`) so it works even if
 // the tab is renamed. Rows are grouped by player_id and returned sorted by
 // display_order, each with a career[] sorted by year. The frontend filters to
 // 2026 participants and maps colours/flags locally.
+// Cache: 60 seconds to reduce table queries while keeping data fresh for live updates.
 function getScorerRace() {
-  return withScriptCache_('scorer_race', 30, computeScorerRace_);
+  return withScriptCache_('scorer_race', 60, computeScorerRace_);
 }
 function computeScorerRace_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -1532,6 +1597,12 @@ function computeScorerRace_() {
 
   const header = rows[0].map(h => String(h).trim());
   const col = name => header.indexOf(name);
+
+  // Validate required columns exist
+  if (col('player_id') < 0 || col('goals_added') < 0 || col('year') < 0) {
+    return { status: 'error', message: 'Missing required columns: player_id, goals_added, year', data: [] };
+  }
+
   const ci = {
     id: col('player_id'), zh: col('player_name_zh'), en: col('player_name_en'),
     cc: col('country_code'), cn: col('country_name_zh'),
@@ -1543,9 +1614,10 @@ function computeScorerRace_() {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const id = String(r[ci.id] || '').trim();
-    if (!id) continue;
+    if (!id) continue;  // Skip empty rows
     const year = Number(r[ci.year]) || 0;
-    if (!year) continue;
+    if (!year) continue;  // Skip rows with invalid year
+
     if (!byId[id]) {
       byId[id] = {
         player_id: id,
@@ -1569,14 +1641,20 @@ function computeScorerRace_() {
   const data = Object.values(byId);
   data.forEach(p => p.career.sort((a, b) => a.year - b.year));
   data.sort((a, b) => a.display_order - b.display_order);
-  return { status: 'ok', updated: getDataVersion(), data: data };
+
+  return {
+    status: 'ok',
+    updated: getDataVersion(),
+    data: data,
+    timestamp: new Date().toISOString()
+  };
 }
 
 // Create or refresh the `scorers` tab that getTopScorers() reads for live 2026
 // goals. Header: match_id, player_name, player_code, goals — one row per
 // player-per-match goal tally. Existing data rows are preserved; only the
 // header, formatting and validation are (re)applied. player_code is limited to
-// the four active players whose 2026 goals merge into wc2026-scorers.html.
+// the active players whose 2026 goals merge into wc2026-scorers.html.
 function setupScorersSheet(showAlert) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const headers = ['match_id', 'player_name', 'player_code', 'goals'];
@@ -1598,7 +1676,7 @@ function setupScorersSheet(showAlert) {
     .requireNumberGreaterThanOrEqualTo(1).setAllowInvalid(false)
     .setHelpText('整數，至少 1').build();
   const codeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['mbappe', 'messi', 'ronaldo', 'kane'], true).setAllowInvalid(false).build();
+    .requireValueInList(['mbappe', 'messi', 'ronaldo', 'kane', 'bellingham'], true).setAllowInvalid(false).build();
 
   sheet.getRange(2, 1, n, 1).setDataValidation(posInt);    // match_id
   sheet.getRange(2, 3, n, 1).setDataValidation(codeRule);  // player_code
@@ -1608,10 +1686,293 @@ function setupScorersSheet(showAlert) {
   sheet.setColumnWidth(2, 160); // player_name
 
   const msg = 'scorers 射手分頁已建立／更新。欄位：match_id, player_name, player_code, goals。' +
-    'player_code 僅允許 mbappe / messi / ronaldo / kane，每列一名球員在一場比賽的進球數。';
+    'player_code 僅允許 mbappe / messi / ronaldo / kane / bellingham，每列一名球員在一場比賽的進球數。';
   Logger.log(msg);
   try { SpreadsheetApp.getUi().alert(msg); } catch (_) {}
   return sheet;
+}
+
+// Create or refresh the `scorer_board` tab — the single management surface for
+// the rounds chart (getScorerBoard reads it). One row per player, goals entered
+// per round directly, plus assists / minutes / country / manual lock. Add a
+// player by adding a row; remove by deleting the row; lock by ticking manual.
+// Existing data rows are preserved; only the header, formatting and validation
+// are (re)applied. A TRUE `manual` row is admin-owned and skipped by
+// importFromApiFootball.
+function setupScorerBoardSheet(showAlert) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const headers = BOARD_HEADERS;
+  let sheet = ss.getSheetByName('scorer_board');
+  if (!sheet) sheet = ss.insertSheet('scorer_board');
+
+  sheet.getRange(1, 1, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#0f4b8f')
+    .setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(2);
+
+  const n = Math.max(sheet.getMaxRows() - 1, 1);
+  const nonNegInt = SpreadsheetApp.newDataValidation()
+    .requireNumberGreaterThanOrEqualTo(0).setAllowInvalid(false)
+    .setHelpText('非負整數').build();
+
+  // Round-goal columns + assists + minutes are non-negative integers; the
+  // `eliminated` and `manual` columns are checkboxes. Column indices are looked
+  // up by header name so the layout survives reordering.
+  const minutesCol = headers.indexOf('minutes') + 1;       // 1-based
+  const firstNumCol = 4;                                   // first round column
+  sheet.getRange(2, firstNumCol, n, minutesCol - firstNumCol + 1).setDataValidation(nonNegInt);
+  sheet.getRange(2, headers.indexOf('eliminated') + 1, n, 1).insertCheckboxes(); // eliminated
+  sheet.getRange(2, headers.indexOf('manual') + 1, n, 1).insertCheckboxes();     // manual lock
+
+  sheet.autoResizeColumns(1, headers.length);
+  sheet.setColumnWidth(2, 160); // player_name
+
+  const msg = 'scorer_board 分頁已建立／更新。這是逐輪射手圖的單一管理頁：每位球員一列，' +
+    '各輪次欄位直接填該輪進球，另有 assists / minutes / country_code / eliminated / manual。' +
+    '勾選 eliminated 該球員線條轉灰（已淘汰）；勾選 manual 鎖定該列（自動匯入不覆寫）。';
+  Logger.log(msg);
+  if (showAlert !== false) { try { SpreadsheetApp.getUi().alert(msg); } catch (_) {} }
+  return sheet;
+}
+
+// ── API-Football ingestion (design D5) ────────────────────────────────────
+// Auto-fills the single `scorer_board` tab (per-round goals + assists + minutes
+// + country) from API-Football's free tier so the rounds chart updates without
+// manual data entry. Admin edits win: a board row whose `manual` lock is TRUE is
+// never touched; unlocked rows are refreshed to the latest totals. The API key
+// is read from Script Property API_FOOTBALL_KEY and is never written to a cell
+// or returned by any endpoint. On any request failure the board is left
+// untouched and the error is logged rather than propagated to the chart.
+//
+// Free tier: https://www.api-football.com/  (host v3.football.api-sports.io)
+//   GET /fixtures?league=<L>&season=<S>   → fixtures (each carries league.round)
+//   GET /fixtures/players?fixture=<id>    → per-player goals/assists/minutes
+// Goals are bucketed by the fixture's ROUND (coarser and more robust than a
+// per-match_id join). LEAGUE/SEASON are confirmed on the first manual run.
+const API_FOOTBALL = {
+  HOST:    'https://v3.football.api-sports.io',
+  LEAGUE:  1,        // FIFA World Cup
+  SEASON:  2026,
+  KEY_PROP: 'API_FOOTBALL_KEY',
+  FINISHED: ['FT', 'AET', 'PEN'],
+};
+
+// API-Football English country name → our 3-letter country_code (for flags).
+// Extend as the logs surface unmapped names; an unmapped name simply yields an
+// empty country_code (default flag) without dropping the player.
+const API_TEAM_CC = {
+  // Hosts
+  'USA': 'USA', 'United States': 'USA', 'Mexico': 'MEX', 'Canada': 'CAN',
+  // UEFA
+  'France': 'FRA', 'England': 'ENG', 'Portugal': 'POR', 'Spain': 'ESP',
+  'Germany': 'GER', 'Italy': 'ITA', 'Netherlands': 'NED', 'Belgium': 'BEL',
+  'Croatia': 'CRO', 'Norway': 'NOR', 'Switzerland': 'SUI', 'Denmark': 'DEN',
+  'Poland': 'POL', 'Austria': 'AUT', 'Serbia': 'SRB', 'Scotland': 'SCO',
+  'Ukraine': 'UKR', 'Turkey': 'TUR', 'Türkiye': 'TUR', 'Wales': 'WAL',
+  'Sweden': 'SWE', 'Czech Republic': 'CZE', 'Czechia': 'CZE', 'Hungary': 'HUN',
+  'Greece': 'GRE', 'Romania': 'ROU', 'Slovakia': 'SVK', 'Slovenia': 'SVN',
+  // CONMEBOL
+  'Argentina': 'ARG', 'Brazil': 'BRA', 'Uruguay': 'URU', 'Colombia': 'COL',
+  'Ecuador': 'ECU', 'Peru': 'PER', 'Chile': 'CHI', 'Paraguay': 'PAR',
+  'Bolivia': 'BOL', 'Venezuela': 'VEN',
+  // CAF
+  'Morocco': 'MAR', 'Senegal': 'SEN', 'Ghana': 'GHA', 'Nigeria': 'NGA',
+  'Egypt': 'EGY', 'Algeria': 'ALG', 'Tunisia': 'TUN', 'Cameroon': 'CMR',
+  'Ivory Coast': 'CIV', 'Côte d’Ivoire': 'CIV', 'Cote d\'Ivoire': 'CIV',
+  'Mali': 'MLI', 'South Africa': 'RSA',
+  // AFC
+  'Japan': 'JPN', 'South Korea': 'KOR', 'Korea Republic': 'KOR',
+  'Iran': 'IRN', 'IR Iran': 'IRN', 'Australia': 'AUS', 'Saudi Arabia': 'KSA',
+  'Qatar': 'QAT', 'Iraq': 'IRQ', 'United Arab Emirates': 'UAE', 'Uzbekistan': 'UZB',
+  // CONCACAF / OFC
+  'Panama': 'PAN', 'Costa Rica': 'CRC', 'Jamaica': 'JAM', 'Honduras': 'HON',
+  'New Zealand': 'NZL',
+};
+
+function importFromApiFootball() {
+  const key = PropertiesService.getScriptProperties().getProperty(API_FOOTBALL.KEY_PROP);
+  if (!key) {
+    Logger.log('importFromApiFootball: 缺少 Script Property ' + API_FOOTBALL.KEY_PROP + '，略過匯入');
+    return;
+  }
+
+  // Fetch the tournament fixtures. Any failure here leaves the board untouched.
+  let fixtures;
+  try {
+    fixtures = apiFootballGet_('/fixtures',
+      { league: API_FOOTBALL.LEAGUE, season: API_FOOTBALL.SEASON }, key);
+  } catch (err) {
+    Logger.log('importFromApiFootball: 取得賽程失敗，資料未變更：' + err.message);
+    return;
+  }
+
+  const finished = (fixtures.response || []).filter(f =>
+    API_FOOTBALL.FINISHED.indexOf((((f.fixture || {}).status || {}).short) || '') >= 0);
+  if (!finished.length) {
+    Logger.log('importFromApiFootball: 無已完成賽事，資料未變更');
+    return;
+  }
+
+  // Aggregate per player across all finished fixtures.
+  // players[code] = { name, country, goals, assists, minutes, rounds: {key: goals} }
+  const players = {};
+  let fixtureFailures = 0;
+  finished.forEach(f => {
+    const fid = (f.fixture || {}).id;
+    const roundKey = apiRoundToKey_(((f.league || {}).round) || '');   // may be null (logged)
+    let pl;
+    try {
+      pl = apiFootballGet_('/fixtures/players', { fixture: fid }, key);
+    } catch (err) {
+      fixtureFailures++;
+      Logger.log('importFromApiFootball: fixture ' + fid + ' 球員資料失敗，略過該場：' + err.message);
+      return;
+    }
+    (pl.response || []).forEach(teamBlock => {
+      const cc = teamNameToCode_((teamBlock.team || {}).name);
+      (teamBlock.players || []).forEach(entry => {
+        const p  = entry.player || {};
+        const st = (entry.statistics && entry.statistics[0]) || {};
+        const code = slugifyPlayer_(p.name);
+        if (!code) return;
+        if (!players[code]) players[code] = { name: p.name, country: cc, goals: 0, assists: 0, minutes: 0, rounds: {} };
+        players[code].minutes += Number((st.games || {}).minutes) || 0;   // all appearances
+        players[code].assists += Number((st.goals || {}).assists) || 0;
+        const g = Number((st.goals || {}).total) || 0;
+        players[code].goals += g;                                          // tournament total
+        if (g > 0 && roundKey) players[code].rounds[roundKey] = (players[code].rounds[roundKey] || 0) + g;
+      });
+    });
+  });
+
+  writeScorerBoard_(SpreadsheetApp.openById(SHEET_ID), players);
+  CacheService.getScriptCache().remove('scorer_board');   // invalidate getScorerBoard cache
+
+  Logger.log('importFromApiFootball: 完成，處理 ' + finished.length + ' 場，球員 ' +
+    Object.keys(players).length + ' 名，失敗 ' + fixtureFailures + ' 場');
+}
+
+// Map an API-Football league.round string to one of our board round keys.
+// e.g. "Group Stage - 2" → gs2, "Round of 16" → r16, "Quarter-finals" → r8,
+// "Semi-finals" → r4, "3rd Place Final"/"Final" → final. Returns null (logged)
+// for anything unrecognised so its goals are skipped rather than misfiled.
+function apiRoundToKey_(round) {
+  const s = String(round).toLowerCase();
+  let m = s.match(/group stage\s*-\s*([123])/);
+  if (m) return 'gs' + m[1];
+  if (/round of 32/.test(s)) return 'r32';
+  if (/round of 16/.test(s)) return 'r16';
+  if (/quarter/.test(s))     return 'r8';
+  if (/semi/.test(s))        return 'r4';
+  if (/final/.test(s))       return 'final';   // covers "3rd Place Final" and "Final"
+  Logger.log('apiRoundToKey_: 未對應的輪次「' + round + '」，該場進球略過');
+  return null;
+}
+
+// GET helper for API-Football. Throws on network error or non-200 so callers
+// can bail without mutating any sheet.
+function apiFootballGet_(path, params, key) {
+  const qs = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+  const res = UrlFetchApp.fetch(API_FOOTBALL.HOST + path + '?' + qs, {
+    method: 'get',
+    headers: { 'x-apisports-key': key },
+    muteHttpExceptions: true,
+  });
+  const code = res.getResponseCode();
+  if (code !== 200) throw new Error('HTTP ' + code);
+  return JSON.parse(res.getContentText());
+}
+
+function teamNameToCode_(name) {
+  if (!name) return '';
+  const cc = API_TEAM_CC[String(name).trim()];
+  if (!cc) Logger.log('teamNameToCode_: 未對應的國家名稱「' + name + '」，country_code 留空');
+  return cc || '';
+}
+
+// Stable player_code slug from an API player name: lowercase ASCII, spaces →
+// hyphens (e.g. "Kylian Mbappé" → "kylian-mbappe"). Admins can rename codes in
+// the sheet; locked rows are then preserved on the next run.
+function slugifyPlayer_(name) {
+  if (!name) return '';
+  return String(name)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')  // strip accents
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// Upsert per-player round goals + assists + minutes + country into scorer_board.
+// Only players who have scored are written. Rows with manual === true are left
+// untouched; unlocked rows are refreshed to the latest per-round goals / totals
+// (country + name filled only when currently blank so admin labels survive);
+// unseen players are appended.
+function writeScorerBoard_(ss, players) {
+  let sheet = ss.getSheetByName('scorer_board');
+  if (!sheet) sheet = setupScorerBoardSheet(false);
+
+  const rows = sheet.getDataRange().getValues();
+  const header = rows[0].map(h => String(h).trim());
+  const ci = {
+    code: header.indexOf('player_code'), name: header.indexOf('player_name'),
+    cc: header.indexOf('country_code'), assists: header.indexOf('assists'),
+    minutes: header.indexOf('minutes'), elim: header.indexOf('eliminated'),
+    manual: header.indexOf('manual'),
+  };
+  if (ci.code < 0) { Logger.log('writeScorerBoard_: scorer_board 缺少 player_code 欄，略過'); return; }
+  const roundCols = BOARD_ROUNDS.map(r => ({ key: r.key, idx: header.indexOf(r.label) }));
+
+  const rowByCode = {};
+  for (let i = 1; i < rows.length; i++) {
+    const code = String(rows[i][ci.code] || '').trim();
+    if (code) rowByCode[code] = i;
+  }
+
+  const appended = [];
+  Object.keys(players).forEach(code => {
+    const p = players[code];
+    if ((p.goals || 0) <= 0) return;   // only players who have scored belong on the board
+    const i = rowByCode[code];
+    if (i == null) {
+      const row = new Array(header.length).fill('');
+      row[ci.code] = code;
+      if (ci.name >= 0) row[ci.name] = p.name;
+      if (ci.cc >= 0) row[ci.cc] = p.country;
+      for (const rc of roundCols) if (rc.idx >= 0) row[rc.idx] = p.rounds[rc.key] || 0;
+      if (ci.assists >= 0) row[ci.assists] = p.assists;
+      if (ci.minutes >= 0) row[ci.minutes] = p.minutes;
+      if (ci.elim >= 0) row[ci.elim] = false;
+      if (ci.manual >= 0) row[ci.manual] = false;
+      appended.push(row);
+      return;
+    }
+    if (ci.manual >= 0 && rows[i][ci.manual] === true) return;   // admin-locked row
+    for (const rc of roundCols) if (rc.idx >= 0) rows[i][rc.idx] = p.rounds[rc.key] || 0;
+    if (ci.assists >= 0) rows[i][ci.assists] = p.assists;
+    if (ci.minutes >= 0) rows[i][ci.minutes] = p.minutes;
+    if (ci.cc >= 0 && !String(rows[i][ci.cc] || '').trim()) rows[i][ci.cc] = p.country;
+    if (ci.name >= 0 && !String(rows[i][ci.name] || '').trim()) rows[i][ci.name] = p.name;
+  });
+
+  // Write back existing rows (refreshed) then append new ones.
+  if (rows.length > 1) sheet.getRange(1, 1, rows.length, header.length).setValues(rows);
+  if (appended.length) sheet.getRange(sheet.getLastRow() + 1, 1, appended.length, header.length).setValues(appended);
+}
+
+// Install (or reinstall) the time-driven trigger that runs importFromApiFootball
+// roughly every 15 minutes. Idempotent: any existing trigger for the same
+// function is removed first so repeated menu clicks don't stack duplicates.
+function installApiFootballTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'importFromApiFootball') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('importFromApiFootball').timeBased().everyMinutes(15).create();
+  const msg = 'API-Football 匯入觸發器已建立：每 15 分鐘執行 importFromApiFootball。' +
+    '請確認已於 Script Property 設定 ' + API_FOOTBALL.KEY_PROP + '。';
+  Logger.log(msg);
+  try { SpreadsheetApp.getUi().alert(msg); } catch (_) {}
 }
 
 function getConfig() {
@@ -1633,7 +1994,7 @@ function touchDataVersion() {
   const updated = new Date().toISOString();
   PropertiesService.getScriptProperties().setProperty('DATA_UPDATED_AT', updated);
   const cache = CacheService.getScriptCache();
-  ['matches_all', 'groups_all', 'config_all', 'top_scorers', 'scorer_race'].forEach(key => cache.remove(key));
+  ['matches_all', 'groups_all', 'config_all', 'top_scorers', 'scorer_board', 'scorer_race'].forEach(key => cache.remove(key));
   SpreadsheetApp.flush();
   return updated;
 }
