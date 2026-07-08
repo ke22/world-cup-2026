@@ -113,32 +113,55 @@ body {
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwCcEru2P2kUpIA4nx2_vxynQ_A4UwbvlvtJ0x6MPihMYifiRl9e8g2Ft8MnuOapVJ_7Q/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+// Public Sheet CSV: 2026 goals only (fast, no GAS cold-start)
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1YDuNRBGTx5Jw3kZBYehlYUW4eIFPClDIC91TR_720js/gviz/tq?tqx=out:csv&gid=1713363711';
 const RACE_CACHE_KEY = 'wc26_race';
-const CACHE_TTL = 60; // seconds
+const SHEET_CACHE_KEY = 'wc26_sheet2026';
+const CACHE_TTL = 300;       // seconds — GAS (cold-start is expensive, cache longer)
+const SHEET_CACHE_TTL = 30;  // seconds — Sheet CSV (fast & cheap, reflect updates quickly)
 
-// ── 11 players who participate in the 2026 World Cup (offline fallback only) ──
+// Maps sheet player_id → PLAYERS key (for fast CSV patch)
+const PLAYER_ID_MAP = {
+  'lionel-messi':      'messi',
+  'kylian-mbappe':     'mbappe',
+  'cristiano-ronaldo': 'cronaldo',
+  'harry-kane':        'kane',
+  'neymar':            'neymar',
+  'enner-valencia':    'valencia',
+  'james-rodriguez':   'james',
+  'romelu-lukaku':     'lukaku',
+  'ivan-perisic':      'perisic',
+  'cody-gakpo':        'gakpo',
+  'vinicius-junior':   'vinicius',
+  'erling-haaland':    'haaland',
+  'ismaila-sarr':      'sarr',
+  'kai-havertz':       'havertz',
+  'Jude Bellingham':   'bellingham',
+};
+
+// ── Players who participate in the 2026 World Cup (offline fallback) ──
 // career omits non-participation years. These numbers are used ONLY when the live
 // getScorerRace feed is unreachable; the sheet's career tab (the single source of
 // truth, shared with wc2026-scorers-bars.html) overrides this whenever GAS responds.
-// Source: FIFA / OPTA.
+// Source: FIFA / OPTA. Last synced: 2026-07-08.
 const PLAYERS = {
   messi:    { name: '梅西',      flag: '🇦🇷', country: 'ARG', color: '#1565C0', career: [
-    { wc: 2006, goals: 1 }, { wc: 2010, goals: 0 }, { wc: 2014, goals: 4 },
-    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 6 },
+    { wc: 2006, goals: 1 }, { wc: 2014, goals: 4 },
+    { wc: 2018, goals: 1 }, { wc: 2022, goals: 7 }, { wc: 2026, goals: 8 },
   ]},
   mbappe:   { name: '姆巴佩',    flag: '🇫🇷', country: 'FRA', color: '#D32F2F', career: [
-    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 6 },
+    { wc: 2018, goals: 4 }, { wc: 2022, goals: 8 }, { wc: 2026, goals: 7 },
   ]},
   cronaldo: { name: '羅納度',    flag: '🇵🇹', country: 'POR', color: '#2E7D32', career: [
-    { wc: 2002, goals: 0 }, { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
+    { wc: 2006, goals: 1 }, { wc: 2010, goals: 1 },
     { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 3 },
   ]},
   kane:     { name: '凱恩',      flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', country: 'ENG', color: '#7B1FA2', career: [
-    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 5 },
+    { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 6 },
   ]},
   neymar:   { name: '內馬爾',    flag: '🇧🇷', country: 'BRA', color: '#FB8C00', career: [
-    { wc: 2014, goals: 4 }, { wc: 2018, goals: 2 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 0 },
+    { wc: 2014, goals: 4 }, { wc: 2018, goals: 2 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 1 },
   ]},
   valencia: { name: '瓦倫西亞',  flag: '🇪🇨', country: 'ECU', color: '#AD1457', career: [
     { wc: 2014, goals: 3 }, { wc: 2022, goals: 3 }, { wc: 2026, goals: 0 },
@@ -147,7 +170,7 @@ const PLAYERS = {
     { wc: 2014, goals: 6 }, { wc: 2018, goals: 0 }, { wc: 2026, goals: 0 },
   ]},
   lukaku:   { name: '盧卡庫',    flag: '🇧🇪', country: 'BEL', color: '#EC407A', career: [
-    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 0 }, { wc: 2026, goals: 2 },
+    { wc: 2014, goals: 1 }, { wc: 2018, goals: 4 }, { wc: 2022, goals: 0 }, { wc: 2026, goals: 3 },
   ]},
   perisic:  { name: '柏瑞斯奇',  flag: '🇭🇷', country: 'CRO', color: '#3949AB', career: [
     { wc: 2014, goals: 2 }, { wc: 2018, goals: 3 }, { wc: 2022, goals: 1 }, { wc: 2026, goals: 1 },
@@ -159,13 +182,16 @@ const PLAYERS = {
     { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
   ]},
   haaland:  { name: '哈蘭德',    flag: '🇳🇴', country: 'NOR', color: '#F9A825', career: [
-    { wc: 2026, goals: 5 },
+    { wc: 2026, goals: 7 },
   ]},
   sarr:     { name: '薩爾',      flag: '🇸🇳', country: 'SEN', color: '#7CB342', career: [
     { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
   ]},
   havertz:  { name: '哈斐茨',    flag: '🇩🇪', country: 'GER', color: '#546E7A', career: [
     { wc: 2022, goals: 2 }, { wc: 2026, goals: 3 },
+  ]},
+  bellingham: { name: '貝林翰',  flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', country: 'ENG', color: '#5C6BC0', career: [
+    { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
   ]},
 };
 
@@ -188,30 +214,71 @@ const META = {
   'erling-haaland':    { color: '#F9A825', flag: '🇳🇴' },
   'ismaila-sarr':      { color: '#7CB342', flag: '🇸🇳' },
   'kai-havertz':       { color: '#546E7A', flag: '🇩🇪' },
+  'Jude Bellingham':   { color: '#5C6BC0', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
 };
 // Fallback flag by country_code when a player_id isn't in META above
 const FLAG_BY_CC = {
   ARG:'🇦🇷', FRA:'🇫🇷', POR:'🇵🇹', ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', BRA:'🇧🇷',
   ECU:'🇪🇨', COL:'🇨🇴', BEL:'🇧🇪', CRO:'🇭🇷', NED:'🇳🇱', NOR:'🇳🇴',
-  SEN:'🇸🇳', GER:'🇩🇪',
+  SEN:'🇸🇳', GER:'🇩🇪', HUN:'🇭🇺', PER:'🇵🇪', POL:'🇵🇱',
 };
 
-// ── sessionStorage cache ──
-function cacheGet(key) {
+// ── localStorage cache (survives tabs & sessions) ──
+function cacheGet(key, ttl = CACHE_TTL) {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
-    if (Date.now() - ts < CACHE_TTL * 1000) return data;
-    sessionStorage.removeItem(key);
+    if (Date.now() - ts < ttl * 1000) return data;
+    localStorage.removeItem(key);
     return null;
   } catch { return null; }
 }
 function cacheSet(key, data) {
-  try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
 
-// ── Fetch full scorer-career data from GAS ──
+// ── Fast path: fetch 2026 goals from public Sheet CSV (no GAS cold-start) ──
+// Returns a map of { player_id: goals_added } for 2026 only.
+async function fetchSheet2026() {
+  const hit = cacheGet(SHEET_CACHE_KEY, SHEET_CACHE_TTL);  // 30s TTL
+  if (hit) return hit;
+  const res = await fetch(SHEET_CSV_URL);
+  if (!res.ok) throw new Error(`Sheet CSV HTTP ${res.status}`);
+  const text = await res.text();
+  // Parse CSV rows (skip header)
+  const lines = text.trim().split('\n').slice(1);
+  const map = {};
+  for (const line of lines) {
+    // Simple CSV parse: split by comma, strip quotes
+    const cols = line.match(/"([^"]*)"/g)?.map(c => c.replace(/"/g, '')) || [];
+    // header: player_id(0), name_zh(1), name_en(2), country_code(3), ..., year(6), ..., goals_added(8)
+    const player_id = cols[0];
+    const goals = parseInt(cols[8], 10);
+    if (player_id && !isNaN(goals)) map[player_id] = goals;
+  }
+  cacheSet(SHEET_CACHE_KEY, map);
+  return map;
+}
+
+// Merge 2026 goals from sheet into a deep copy of PLAYERS
+function applySheet2026(players, goalsMap) {
+  const out = {};
+  for (const [key, p] of Object.entries(players)) {
+    // Find the player_id for this key
+    const pid = Object.keys(PLAYER_ID_MAP).find(id => PLAYER_ID_MAP[id] === key);
+    const goals2026 = pid !== undefined ? goalsMap[pid] : undefined;
+    out[key] = {
+      ...p,
+      career: p.career.map(c =>
+        c.wc === 2026 && goals2026 !== undefined ? { ...c, goals: goals2026 } : c
+      ),
+    };
+  }
+  return out;
+}
+
+// ── Full career data from GAS (slow but complete) ──
 async function fetchScorerRace() {
   const hit = cacheGet(RACE_CACHE_KEY);
   if (hit) return hit;
@@ -534,23 +601,37 @@ function render(playerData) {
 function postHeight() {
   window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
 }
+
+// Render-first strategy: progressively better data in 3 steps.
 async function main() {
+  // 1️⃣ Instant render — zero network wait
+  render(PLAYERS);
+  postHeight();
+
+  // 2️⃣ Fast path: fetch 2026 goals from public Sheet CSV (no GAS cold-start)
+  //    Updates 2026 numbers within ~200–500ms, well before GAS responds.
   try {
-    // Prioritize live data from GAS; fallback to hardcoded PLAYERS only on network failure
+    const goalsMap = await fetchSheet2026();
+    if (Object.keys(goalsMap).length) {
+      const patched = applySheet2026(PLAYERS, goalsMap);
+      render(patched);
+      postHeight();
+    }
+  } catch (e) {
+    console.warn('Sheet CSV unavailable, skipping fast update:', e.message);
+  }
+
+  // 3️⃣ Full career data from GAS (slowest but most accurate)
+  try {
     const raceData = await fetchScorerRace();
     const built = buildFromRace(raceData);
     if (Object.keys(built).length) {
       render(built);
-    } else {
-      // No data from API, use hardcoded fallback
-      render(PLAYERS);
+      postHeight();
     }
   } catch (e) {
-    // Network error: show hardcoded fallback
-    console.warn('Failed to fetch scorer race:', e);
-    render(PLAYERS);
+    console.warn('GAS unavailable, using Sheet CSV / fallback:', e.message);
   }
-  postHeight();
 }
 
 main();

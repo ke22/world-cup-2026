@@ -332,3 +332,56 @@ const labelX = i < WC_YEARS.length - 1
 **問題**：手動更新 `career` 分頁的 2026 進球，`wc2026-scorers-lines.html` 卻完全沒變化。
 **原因**：`scorers-lines` 讀的是 `getTopScorers`（`scorers` 分頁，只有 4 名球員 + HTML 內硬編碼 `PLAYERS` fallback），而使用者改的是 `career` 分頁（`getScorerRace`）。同一份「2026 進球」實際上有三個各自獨立的來源，改到了沒被前端讀取的那一份。
 **解法**：把 lines 圖改讀 `getScorerRace`（與 bars 圖同一來源），`career` 分頁成為單一真相來源；硬編碼 `PLAYERS` 只留離線 fallback。診斷法：`grep -l "getTopScorers\|getScorerRace" *.html` 先確認每個前端讀哪個 action，再對回它對應的 tab——別假設「圖表都吃同一份資料」。
+
+---
+
+## 30. HTML FALLBACK 數據與 Google Sheets 不同步
+
+**問題**：`wc2026-scorers-rounds-endlabel-v4.html` 頁面顯示舊的射手數據（R16 時期：Mbappé 7球、Messi 7球），與 Google Sheets 中 `scorer_board` sheet 的最新數據不一致（Messi 8球、各輪次分布不同）。頁面會先顯示舊 FALLBACK 數據，幾秒後才跳到正確的 GAS API 數據。
+
+**原因**：HTML 文件中 `FALLBACK` 常數（第 219–230 行）是硬編碼的靜態數據，每當 Google Sheets 中 `scorer_board` sheet 更新時，HTML 的 FALLBACK 需要手動同步——這一步經常被遺漏。前端會先用 FALLBACK 渲染（秒速），再背景 fetch GAS API；若 FALLBACK 太舊，使用者感知上像「數據跟表單不一致」。
+
+**解法**：
+1. 讀取 Google Sheets `scorer_board` sheet 的最新球員數據（assists、minutes、各輪次進球分布）
+2. 更新 HTML 中 FALLBACK 常數的所有球員資料
+3. 同步優化 GAS API 性能：
+   - 增加快取時間：30 秒 → 60 秒，減少頻繁 sheet 查詢
+   - 優化 `computeScorerBoard_()` 函式：改用 `getLastRow()`/`getLastColumn()` 只讀取實際有數據的範圍，而非 `getDataRange()`（可能包含很多空行）
+
+**教訓**：FALLBACK 是離線渲染的快取，不是一旦 API 正常就能遺忘。每當 Sheet 資料更新時，應同步更新 FALLBACK，否則新使用者首屏看到的仍是舊數據。可考慮新增「定期更新 FALLBACK」的工作流程（手動或自動），或在 Git repo 中加提醒註釋。
+
+---
+
+## 33. GAS API render-blocking 造成首屏空白（wc2026-scorers-lines-v1）
+
+**問題**：`wc2026-scorers-lines-v1.html` 射手累計進球折線圖載入緩慢，使用者開啟頁面後要等 3～8 秒才看到圖表，期間只有空白。
+
+**原因**：`main()` 的執行順序是「await GAS API → render」，圖表渲染被 GAS 回應時間完全 block 住。GAS Web App 有冷啟動成本（3～8 秒），加上讀取 Google Sheet 又需 2～5 秒。即使有硬編碼的 `PLAYERS` fallback，也只在 API **失敗**時才觸發，正常流程下使用者還是要等。
+
+此外：
+- 快取用的是 `sessionStorage`（分頁關閉即消失，跨分頁無效），TTL 只有 60 秒，效益低
+- `PLAYERS` fallback 數據沒有跟著 Sheet 更新，首屏顯示的是舊進球數
+
+**解法**：
+
+1. **Render-first 策略**：改為先用 `PLAYERS` 立刻畫圖（零網路等待），再背景 fetch GAS API，有新資料才靜默重繪：
+   ```js
+   // 舊：等 API 才畫
+   const data = await fetchScorerRace();
+   render(data);
+
+   // 新：先畫舊資料，背景更新
+   render(PLAYERS);          // 立刻顯示
+   postHeight();
+   const data = await fetchScorerRace();  // 背景等待
+   if (data) { render(data); postHeight(); }
+   ```
+
+2. **快取改用 `localStorage`**：跨分頁、跨 session 共用，同一 origin 下多個 embed iframe 也能共享同一份快取。
+
+3. **TTL 從 60s 延長至 300s**：比賽期間進球數不會每分鐘變，減少不必要的 GAS 冷啟動。
+
+4. **同步更新 PLAYERS fallback**：每次 Sheet 有重大更新（進球數變動、新球員加入）時，手動同步硬編碼數據，確保首屏顯示正確。本次更新：Messi 6→8、Mbappé 6→7、Kane 5→6、Haaland 5→7、Lukaku 2→3、Neymar 0→1；新增 Bellingham（4球）。
+
+**教訓**：凡是靠外部 API 才能渲染的頁面，都應採用「先渲染 fallback，API 回來再更新」的模式（Stale-While-Revalidate）。GAS 的冷啟動不可控，不應讓使用者的首屏體驗依賴它。
+
