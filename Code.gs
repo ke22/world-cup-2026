@@ -1595,40 +1595,41 @@ function computeScorerRace_() {
   }
   if (!sheet) return { status: 'ok', updated: getDataVersion(), data: [] };
 
-  const rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return { status: 'ok', updated: getDataVersion(), data: [] };
-
-  const header = rows[0].map(h => String(h).trim());
+  // 優化：只讀必要的列 (player_id, name_zh, country_code, year, goals_added, cumulative_goals, display_order)
+  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
   const col = name => header.indexOf(name);
 
-  // Validate required columns exist
-  if (col('player_id') < 0 || col('goals_added') < 0 || col('year') < 0) {
-    return { status: 'error', message: 'Missing required columns: player_id, goals_added, year', data: [] };
-  }
-
   const ci = {
-    id: col('player_id'), zh: col('player_name_zh'), en: col('player_name_en'),
-    cc: col('country_code'), cn: col('country_name_zh'),
-    year: col('year'), ga: col('goals_added'), cum: col('cumulative_goals'),
-    role: col('series_role'), order: col('display_order'), proj: col('is_projected'),
+    id: col('player_id'), zh: col('player_name_zh'),
+    cc: col('country_code'), year: col('year'), ga: col('goals_added'),
+    cum: col('cumulative_goals'), order: col('display_order'),
   };
 
+  if (ci.id < 0 || ci.ga < 0 || ci.year < 0) {
+    return { status: 'error', message: 'Missing required columns', data: [] };
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { status: 'ok', updated: getDataVersion(), data: [] };
+
+  // 只讀必要的列，不讀整個表格
+  const cols = [ci.id, ci.zh, ci.cc, ci.year, ci.ga, ci.cum, ci.order];
+  const colStr = cols.map(c => c + 1).join(',');
+  const rows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+
   const byId = {};
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const id = String(r[ci.id] || '').trim();
-    if (!id) continue;  // Skip empty rows
+    if (!id) continue;
     const year = Number(r[ci.year]) || 0;
-    if (!year) continue;  // Skip rows with invalid year
+    if (!year) continue;
 
     if (!byId[id]) {
       byId[id] = {
         player_id: id,
         name_zh: String(r[ci.zh] || ''),
-        name_en: String(r[ci.en] || ''),
         country_code: String(r[ci.cc] || ''),
-        country_name_zh: String(r[ci.cn] || ''),
-        series_role: ci.role >= 0 ? String(r[ci.role] || '') : '',
         display_order: ci.order >= 0 ? (Number(r[ci.order]) || 999) : 999,
         career: [],
       };
@@ -1636,8 +1637,6 @@ function computeScorerRace_() {
     byId[id].career.push({
       year: year,
       goals: Number(r[ci.ga]) || 0,
-      cumulative: ci.cum >= 0 ? (Number(r[ci.cum]) || 0) : 0,
-      is_projected: ci.proj >= 0 ? String(r[ci.proj]).toUpperCase() === 'TRUE' : false,
     });
   }
 
@@ -1645,12 +1644,7 @@ function computeScorerRace_() {
   data.forEach(p => p.career.sort((a, b) => a.year - b.year));
   data.sort((a, b) => a.display_order - b.display_order);
 
-  return {
-    status: 'ok',
-    updated: getDataVersion(),
-    data: data,
-    timestamp: new Date().toISOString()
-  };
+  return { status: 'ok', updated: getDataVersion(), data: data };
 }
 
 // Create or refresh the `scorers` tab that getTopScorers() reads for live 2026
