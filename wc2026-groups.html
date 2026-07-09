@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async onload="twemoji.parse(document.body,{base:'emoji/',folder:'svg',ext:'.svg'})"></script>
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async onload="twemoji.parse(document.body,{base:'https://imgcdn.cna.com.tw/embed/wc2026/emoji/',folder:'svg',ext:'.svg'})"></script>
 <title>世界盃小組積分</title>
 <style>
 /* ── CNA Design System Variables ── */
@@ -210,7 +210,7 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 <div class="page">
   <header class="page-header">
     <span class="page-header-title">世界盃小組積分</span>
-    <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+    <img src="https://imgcdn.cna.com.tw/embed/wc2026/cna_logo.svg" class="cna-logo" alt="CNA">
   </header>
 
   <nav class="anchor-nav" id="anchor-nav" aria-label="跳至組別">
@@ -232,7 +232,7 @@ function teamName(team) {
   return TEAM_NAMES_BY_CODE[team.code] || team.name || team.code || '';
 }
 function parseTwemoji(el) {
-  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'https://imgcdn.cna.com.tw/embed/wc2026/emoji/', folder: 'svg', ext: '.svg' });
 }
 
 function cacheGet(key) {

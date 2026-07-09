@@ -102,7 +102,7 @@ body {
 <div class="wrapper">
   <div class="panel">
     <div class="header">
-      <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+      <img src="https://imgcdn.cna.com.tw/embed/wc2026/cna_logo.svg" class="cna-logo" alt="CNA">
       <span class="header-title">2026 世界盃射手榜・生涯進球</span>
     </div>
 
@@ -295,7 +295,7 @@ function emojiToCodePoint(emoji) {
   }
   return pts.join('-');
 }
-function flagHref(emoji) { return `emoji/${emojiToCodePoint(emoji)}.svg`; }
+function flagHref(emoji) { return `https://imgcdn.cna.com.tw/embed/wc2026/emoji/${emojiToCodePoint(emoji)}.svg`; }
 
 // ── Tooltip ──
 const tt     = document.getElementById('tt');

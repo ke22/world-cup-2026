@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async onload="twemoji.parse(document.body,{base:'emoji/',folder:'svg',ext:'.svg'})"></script>
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async onload="twemoji.parse(document.body,{base:'https://imgcdn.cna.com.tw/embed/wc2026/emoji/',folder:'svg',ext:'.svg'})"></script>
 <title>世界盃每日賽程</title>
 <style>
 /* ── CNA Design System Variables ── */
@@ -321,7 +321,7 @@ function teamName(team) {
 }
 // ────────────────────────────────────────────
 function parseTwemoji(el) {
-  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'https://imgcdn.cna.com.tw/embed/wc2026/emoji/', folder: 'svg', ext: '.svg' });
 }
 
 const WEEKDAYS = ['日','一','二','三','四','五','六'];
@@ -489,7 +489,7 @@ function renderShell() {
     <div class="header">
       <span class="header-title">世界盃每日賽程</span>
       <div class="header-actions">
-        <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+        <img src="https://imgcdn.cna.com.tw/embed/wc2026/cna_logo.svg" class="cna-logo" alt="CNA">
       </div>
     </div>
     <div class="date-nav" id="date-nav"></div>

@@ -100,7 +100,7 @@ body {
 <div class="wrapper">
   <div class="panel">
     <div class="header">
-      <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+      <img src="https://imgcdn.cna.com.tw/embed/wc2026/cna_logo.svg" class="cna-logo" alt="CNA">
       <span class="header-title">世界盃歷史射手競賽</span>
     </div>
 
@@ -141,6 +141,9 @@ const HISTORICAL_DATA = {
   ]},
   kane:      { name: '凱恩',       flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: '#7B1FA2', active: true,  career: [
     { wc: 2018, goals: 6 }, { wc: 2022, goals: 2 }, { wc: 2026, goals: 5 },
+  ]},
+  bellingham:{ name: '貝林翰',     flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: '#E65100', active: true,  career: [
+    { wc: 2022, goals: 1 }, { wc: 2026, goals: 4 },
   ]},
   klose:     { name: '克洛澤',     flag: '🇩🇪', color: '#b0b8c1', active: false, career: [
     { wc: 2002, goals: 5 }, { wc: 2006, goals: 5 }, { wc: 2010, goals: 4 }, { wc: 2014, goals: 2 },
@@ -333,7 +336,7 @@ function emojiToCodePoint(emoji) {
   }
   return pts.join('-');
 }
-function flagHref(emoji) { return `emoji/${emojiToCodePoint(emoji)}.svg`; }
+function flagHref(emoji) { return `https://imgcdn.cna.com.tw/embed/wc2026/emoji/${emojiToCodePoint(emoji)}.svg`; }
 
 // Rough text-width estimate for centring a flag + label together
 function estTextWidth(str, fs) {

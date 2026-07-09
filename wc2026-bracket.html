@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:,">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async onload="twemoji.parse(document.body,{base:'emoji/',folder:'svg',ext:'.svg'})"></script>
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous" async onload="twemoji.parse(document.body,{base:'https://imgcdn.cna.com.tw/embed/wc2026/emoji/',folder:'svg',ext:'.svg'})"></script>
 <title>世界盃對戰表</title>
 <style>
 /* ── CNA Design System ── */
@@ -706,7 +706,7 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 <div class="page">
   <header class="page-header">
     <span class="page-header-title">世界盃對戰表</span>
-    <img src="cna_logo.svg" class="cna-logo" alt="CNA">
+    <img src="https://imgcdn.cna.com.tw/embed/wc2026/cna_logo.svg" class="cna-logo" alt="CNA">
   </header>
 
   <div id="bracket-desktop" class="bracket-desktop">
@@ -718,7 +718,7 @@ img.emoji { height: 1.2em; width: 1.2em; vertical-align: -0.2em; display: inline
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
 const CACHE_TTL = 60;
 function parseTwemoji(el) {
-  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'emoji/', folder: 'svg', ext: '.svg' });
+  if (typeof twemoji !== 'undefined') twemoji.parse(el, { base: 'https://imgcdn.cna.com.tw/embed/wc2026/emoji/', folder: 'svg', ext: '.svg' });
 }
 
 const FLAG_ENG = String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f);
