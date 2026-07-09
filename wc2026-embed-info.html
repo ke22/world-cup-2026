@@ -294,6 +294,27 @@ footer {
     </div>
   </div>
 
+  <!-- ── 2026 射手榜（逐輪版）── -->
+  <div class="card">
+    <div class="card-header">
+      <h2>🏅 2026 射手榜（逐輪版）</h2>
+      <span class="tag">wc2026-scorers-rounds-endlabel-v4.html</span>
+    </div>
+    <div class="card-body">
+      <div class="card-meta">
+        <div class="card-meta-item">建議寬度：<strong>100%</strong></div>
+        <div class="card-meta-item">初始高度：<strong>500px（自動撐高）</strong></div>
+        <div class="card-meta-item">postMessage：<strong>✓ 支援</strong></div>
+      </div>
+      <div class="section-title">嵌入代碼</div>
+      <div class="code-block" id="code-scorers-rounds">
+        <button class="copy-btn" onclick="copyCode('code-scorers-rounds', this)">複製</button>
+        <pre id="pre-scorers-rounds"></pre>
+      </div>
+      <p class="note">本屆前 10 名射手的逐輪累計進球步階折線；X 軸為賽事輪次，名次依金靴獎規則（進球→助攻→上場時間）排序。點選／滑過任一進球點可聚焦該球員。</p>
+    </div>
+  </div>
+
   <!-- ── postMessage 說明 ── -->
   <div class="postmsg-note">
     <strong>⚡ 自動高度調整說明</strong><br>
@@ -316,6 +337,7 @@ const CHARTS = [
   { id: 'scorers',  file: 'wc2026-scorers.html',  title: '世界盃歷史射手競賽', height: 500 },
   { id: 'scorers-lines', file: 'wc2026-scorers-lines.html', title: '2026 世界盃射手競賽（折線）', height: 500 },
   { id: 'scorers-bars',  file: 'wc2026-scorers-bars.html',  title: '2026 世界盃射手榜（長條）',   height: 480 },
+  { id: 'scorers-rounds', file: 'wc2026-scorers-rounds-endlabel-v4.html', title: '2026 世界盃射手榜（逐輪）', height: 500 },
 ];
 
 function buildCode(baseUrl, chart) {
