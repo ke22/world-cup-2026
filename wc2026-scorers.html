@@ -236,7 +236,19 @@ const VW = 720, VH = 440;
 const ML = 48, MT = 28, MR = 105, MB = 52;
 const PW = VW - ML - MR;  // 567
 const PH = VH - MT - MB;  // 360
-const MAX_Y = 20;
+// Dynamic Y ceiling: 20 is the historical default, but active players still
+// adding 2026 goals (e.g. Mbappe) can push their cumulative total past it —
+// recomputed in render() from the actual data so the line never clips.
+let MAX_Y = 20;
+let Y_STEP = 2;
+function computeMaxY(playerData) {
+  let maxTotal = 0;
+  for (const p of Object.values(playerData)) {
+    const total = p.career.reduce((s, t) => s + (Number(t.goals) || 0), 0);
+    if (total > maxTotal) maxTotal = total;
+  }
+  return Math.max(20, Math.ceil(maxTotal / 2) * 2);
+}
 
 // WC years covered by the 13 displayed players (gaps where no player has data are omitted)
 const WC_YEARS = [1954,1958,1962,1966,1970,1974,1978,1990,1994,1998,2002,2006,2010,2014,2018,2022,2026];
@@ -362,6 +374,9 @@ function drawLabel(parent, x, y, anchor, flagEmoji, label, textAttrs) {
 
 // ── Render ──
 function render(playerData) {
+  MAX_Y = computeMaxY(playerData);
+  Y_STEP = MAX_Y > 30 ? 5 : 2;
+
   const svg = document.getElementById('chart');
   svg.innerHTML = '';
 
@@ -371,14 +386,14 @@ function render(playerData) {
 
   // ── Y-axis grid ──
   const gridG = mk('g', {}, svg);
-  for (let g = 0; g <= 20; g += 2) {
+  for (let g = 0; g <= MAX_Y; g += Y_STEP) {
     const y = cy(g);
     mk('line', {
       x1: ML, y1: f(y), x2: ML+PW, y2: f(y),
       stroke: g === 0 ? 'rgba(15,50,96,0.2)' : 'rgba(15,50,96,0.06)',
       'stroke-width': g === 0 ? 1.2 : 0.7,
     }, gridG);
-    if (g > 0 && g % 2 === 0) {
+    if (g > 0) {
       txt(String(g), {
         x: ML - 6, y: f(y + 4),
         'text-anchor': 'end', fill: '#94a3b8', 'font-size': '10.5',

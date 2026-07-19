@@ -200,6 +200,7 @@ body {
 .bracket-tree {
   display: flex;
   align-items: stretch;
+  position: relative;
 }
 
 /* ── Group boxes column ── */
@@ -448,6 +449,10 @@ body {
 .mn-name  { flex: 1; font-size: 0.55rem; font-weight: 600; color: var(--fg); min-width: 0; white-space: nowrap; overflow: hidden; line-height: normal; word-break: normal; }
 .mn-name.seed { font-size: 0.55rem; font-weight: 600; color: var(--accent-2); font-style: normal; }
 .mn-name.tbd  { font-size: 0.55rem; color: var(--muted); font-weight: 600; font-style: normal; }
+/* Long localized team names (e.g. 沙烏地阿拉伯) overflow the fixed-width
+   card and get clipped by the column's overflow:hidden — shrink instead. */
+.mn-name.long  { font-size: 0.48rem; }
+.mn-name.xlong { font-size: 0.42rem; }
 .mn-score { font-size: 0.9rem; font-weight: 800; color: var(--fg); min-width: 14px; text-align: right; flex-shrink: 0; }
 .mn-score.winner { color: var(--accent); }
 .mn-score.live   { color: var(--live-color); }
@@ -539,18 +544,26 @@ body {
     0 3px 0 rgba(6,42,89,0.50),
     0 7px 14px rgba(15,75,143,0.26);
 }
-.center-slot {
-  width: 100%;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 5px 7px;
-  display: flex; align-items: center; gap: 5px;
+
+/* ── Bronze (3rd place) overlay — floats in the blank space the stretched
+   round-col already has below the (vertically-centred) SF slot, wired to the
+   two SF losers by a JS-computed connector. No extra height is reserved for
+   it; it overlaps existing tree space. See positionBronzeOverlay(). ── */
+.bronze-overlay {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  pointer-events: none;
 }
-.center-slot .mn-flag { font-size: 14px; flex-shrink: 0; }
-.center-slot .mn-name { flex: 1; font-size: 0.72rem; font-weight: 700; color: var(--fg); line-height: 1.25; word-break: break-all; }
-.center-slot .mn-name.tbd { color: var(--muted); font-weight: 400; font-style: italic; font-size: 11px; }
-.center-slot .mn-score { font-size: 13px; font-weight: 800; color: var(--fg); }
-.center-slot .mn-score.winner { color: var(--accent); }
-.center-slot .mn-score.live   { color: var(--live-color); }
+.bronze-lines { position: absolute; left: 0; top: 0; overflow: visible; }
+.bronze-lines .bronze-line { fill: none; stroke: var(--border-line); stroke-width: 2; }
+.bronze-box {
+  position: absolute;
+  width: 130px; /* fallback only — JS sets this to match the SF card width */
+  display: flex; flex-direction: column; gap: 4px;
+}
+.bronze-label {
+  font-size: 10px; font-weight: 800; color: var(--muted);
+  text-align: center; letter-spacing: 0.02em;
+}
 
 /* ── Seed legend note ── */
 .seed-legend {
@@ -870,7 +883,11 @@ function buildNode(m) {
     const tbd  = isTBD(t);
     const seed = tbd ? R32_SEEDS[m.match_id]?.[idx] : null;
     const label = seed ? formatSeed(seed) : (tbd ? '' : teamName(t));
-    const nameCls = seed ? 'seed' : (tbd ? 'tbd' : '');
+    let nameCls = seed ? 'seed' : (tbd ? 'tbd' : '');
+    if (!seed && !tbd) {
+      if (label.length >= 6) nameCls = 'xlong';
+      else if (label.length === 5) nameCls = 'long';
+    }
     const flagHtml = tbd ? '' : `<span class="mn-flag">${t.flag}</span>`;
 
     let scoreHtml = '';
@@ -890,30 +907,6 @@ function emptyNode() {
   return `<div class="match-node">
     <div class="mn-row"><span class="mn-name tbd">待定</span></div>
     <div class="mn-row"><span class="mn-name tbd">待定</span></div>
-  </div>`;
-}
-
-/* ── Center split slot (one team row for Final/Bronze) ── */
-function buildCenterSlot(m, teamIdx) {
-  if (!m) {
-    return `<div class="center-slot"><span class="mn-name tbd">待定</span></div>`;
-  }
-  const t = teamIdx === 0 ? m.team1 : m.team2;
-  const score = teamIdx === 0 ? m.score1 : m.score2;
-  const oppScore = teamIdx === 0 ? m.score2 : m.score1;
-  const fin = m.status === 'finished';
-  const liv = m.status === 'live';
-  const tbd = isTBD(t);
-
-  let scoreHtml = '';
-  if ((fin || liv) && score != null) {
-    const w = fin && winnerIdx(m) === teamIdx;
-    scoreHtml = `<span class="mn-score${w ? ' winner' : liv ? ' live' : ''}">${score}${fin?penTag(m,teamIdx):''}</span>`;
-  }
-  return `<div class="center-slot">
-    <span class="mn-flag">${tbd ? '' : t.flag}</span>
-    <span class="mn-name${tbd ? ' tbd' : ''}">${tbd ? '待定' : teamName(t)}</span>
-    ${scoreHtml}
   </div>`;
 }
 
@@ -1007,7 +1000,7 @@ function renderDesktop(matches) {
     </div>`;
   }
 
-  function sfCol(m, collapsed, roundLabel) {
+  function sfCol(m, collapsed, roundLabel, slotId) {
     const cls = collapsed ? ' collapsed' : '';
     const grip = `<div class="col-grip" onclick="toggleDesktopCol(this.closest('.round-col'));event.stopPropagation()" title="收合 ${roundLabel}">⟨</div>`;
     return `<div class="round-col${cls}" style="width:${COL_W}px" data-col-w="${COL_W}" data-label="${roundLabel}" onclick="toggleDesktopCol(this)">
@@ -1016,7 +1009,7 @@ function renderDesktop(matches) {
       </div>
       <div class="col-content-wrap">
         <div class="col-content">
-          <div class="match-slot-single">${m ? buildNode(m) : emptyNode()}</div>
+          <div class="match-slot-single"${slotId ? ` id="${slotId}"` : ''}>${m ? buildNode(m) : emptyNode()}</div>
         </div>
         ${grip}
       </div>
@@ -1126,13 +1119,13 @@ function renderDesktop(matches) {
           ${col(r32L, r32LCol, '32強')}
           ${col(r16L, r16LCol, '16強')}
           ${col(qfL,  qfLCol,  '8強')}
-          ${sfCol(sfL, sfLCol, '4強')}
+          ${sfCol(sfL, sfLCol, '4強', 'sfSlotL')}
           ${finalSingleCol(fin, 0)}
         </div>
         ${trophyCenter()}
         <div class="bracket-right" style="display:contents">
           ${finalSingleCol(fin, 1)}
-          ${sfCol(sfR, sfRCol, '4強')}
+          ${sfCol(sfR, sfRCol, '4強', 'sfSlotR')}
           ${col(qfR,  qfRCol,  '8強')}
           ${col(r16R, r16RCol, '16強')}
           ${col(r32R, r32RCol, '32強')}
@@ -1140,6 +1133,13 @@ function renderDesktop(matches) {
         <div class="groups-col right-col" style="width:${GRP_W}px">
           ${rightGroups.map(l=>groupBox(l)).join('')}
         </div>
+        ${t3 ? `<div class="bronze-overlay" id="bronzeOverlay">
+          <svg class="bronze-lines" id="bronzeLines"></svg>
+          <div class="bronze-box" id="bronzeBox">
+            <div class="bronze-label">季軍賽</div>
+            ${buildNode(t3)}
+          </div>
+        </div>` : ''}
       </div>
       </div>
     </div>
@@ -1165,6 +1165,99 @@ try {
     window.parent.postMessage({ type: 'wc2026-resize', height: Math.ceil(h) }, '*');
   }).observe(document.body);
 } catch {}
+
+// Position the 季軍賽 box + its two connector lines just under the SF slots.
+// Runs after every layout change (initial render, resize, column
+// collapse/expand) since collapsing an upstream round shifts SF sideways.
+// The box floats in the blank space align-items:stretch already leaves below
+// the (vertically-centred) SF slot inside the tree's natural height — it
+// does not push the tree taller, so it visually overlaps the chart directly
+// under 4強 rather than sitting in a separate reserved row.
+// Uses offsetLeft/offsetTop (unaffected by the bracket-inner scale transform)
+// rather than getBoundingClientRect, so it stays correct at any zoom scale.
+function positionBronzeOverlay() {
+  const tree  = document.querySelector('.bracket-tree');
+  const box   = document.getElementById('bronzeBox');
+  const svg   = document.getElementById('bronzeLines');
+  const slotL = document.getElementById('sfSlotL');
+  const slotR = document.getElementById('sfSlotR');
+  if (!tree || !box || !svg) return;
+
+  const treeW = tree.clientWidth;
+  const treeH = tree.clientHeight;
+  const gap   = 14;
+
+  // SF columns collapsed (hidden via display:none) → offsets are meaningless;
+  // fall back to a plain box tucked near the bottom, no connector lines.
+  const visible = slotL && slotR && slotL.offsetParent && slotR.offsetParent;
+
+  // slotL/slotR (.match-slot-single) stretch to fill the whole column height
+  // (flex:1, column height set by the tallest sibling e.g. the trophy/nav
+  // column) — only the inner .match-node card has the card's true visual
+  // size, vertically centred inside the slot via align-items:center. Anchor
+  // the connector to the CARD, not the stretched slot, or it lands near the
+  // bottom of the column instead of at the visible card's edge.
+  const cardL = visible ? (slotL.querySelector('.match-node') || slotL) : null;
+  const cardR = visible ? (slotR.querySelector('.match-node') || slotR) : null;
+
+  // Box keeps its own natural CSS width (130px, sized for the bronze
+  // match's own team names) rather than being forced to match the SF cards
+  // — those show a different match and can be much narrower (short names),
+  // which would otherwise clip a long bronze-match team name. The gap-clamp
+  // below still shrinks it if the SF cards leave too little room.
+  box.style.width = '';
+
+  const boxW  = box.offsetWidth  || 130;
+  const boxH  = box.offsetHeight || 70;
+
+  if (!visible) {
+    box.style.left = ((treeW - boxW) / 2) + 'px';
+    box.style.top  = Math.max(0, treeH - boxH - gap) + 'px';
+    svg.innerHTML = '';
+    return;
+  }
+
+  function relTo(el, ancestor) {
+    let x = 0, y = 0, node = el;
+    while (node && node !== ancestor) { x += node.offsetLeft; y += node.offsetTop; node = node.offsetParent; }
+    return { x, y };
+  }
+  const pL = relTo(cardL, tree), pR = relTo(cardR, tree);
+  const lx = pL.x + cardL.offsetWidth / 2, ly = pL.y + cardL.offsetHeight;
+  const rx = pR.x + cardR.offsetWidth / 2, ry = pR.y + cardR.offsetHeight;
+  const midX = (lx + rx) / 2;
+
+  // Clamp horizontally to the gap between the two SF cards' facing edges —
+  // the Final/trophy columns in between can be narrower than boxW, and an
+  // uncapped centred box would overlap into the SF cards themselves. If even
+  // the shrunk-to-card-width box doesn't fit the gap, shrink it further.
+  const innerMargin = 8;
+  const gapLeft  = pL.x + cardL.offsetWidth + innerMargin;
+  const gapRight = pR.x - innerMargin;
+  let effBoxW = boxW;
+  if (gapRight - gapLeft < effBoxW) {
+    effBoxW = Math.max(50, gapRight - gapLeft);
+    box.style.width = effBoxW + 'px';
+  }
+  let boxLeft = midX - effBoxW / 2;
+  boxLeft = Math.max(boxLeft, gapLeft);
+  boxLeft = Math.min(boxLeft, gapRight - effBoxW);
+
+  // Sit right under whichever SF slot sits lower, clamped so it never spills
+  // past the tree's own bottom edge (no extra height reserved for it).
+  const slotBottom = Math.max(ly, ry);
+  const boxTop = Math.min(slotBottom + gap, treeH - boxH);
+  box.style.left = boxLeft + 'px';
+  box.style.top  = boxTop + 'px';
+
+  const boxLeftX = boxLeft + 14, boxRightX = boxLeft + effBoxW - 14;
+  svg.setAttribute('width', treeW);
+  svg.setAttribute('height', treeH);
+  svg.innerHTML = `
+    <path d="M ${lx} ${ly} C ${lx} ${ly + 22}, ${boxLeftX} ${boxTop - 18}, ${boxLeftX} ${boxTop}" class="bronze-line"/>
+    <path d="M ${rx} ${ry} C ${rx} ${ry + 22}, ${boxRightX} ${boxTop - 18}, ${boxRightX} ${boxTop}" class="bronze-line"/>
+  `;
+}
 
 function fitBracket() {
   const inner = document.querySelector('.bracket-inner');
@@ -1206,6 +1299,7 @@ function fitBracket() {
       outer.scrollLeft = Math.max(0, (naturalW - availW) / 2);
     });
   }
+  positionBronzeOverlay();
   notifyHeight();
 }
 

@@ -164,7 +164,7 @@ body { -webkit-tap-highlight-color: transparent; }
     </div>
 
     <div class="note-row">
-      折線僅顯示仍有機會爭金靴獎（所屬球隊尚未淘汰）的射手，X 軸為賽事輪次、Y 軸為累計進球；下方表格為完整前 10 名。名次依國際足總金靴獎規則排序：進球數 → 助攻數 → 上場時間（少者優先）。線條止於各球員最後進球的輪次；點選或滑過任一進球點可聚焦該球員。資料來源：FIFA / API-Football。<br><span id="update-time"></span>
+      X 軸為賽事輪次、Y 軸為累計進球；下方表格為完整前 10 名。名次依國際足總金靴獎規則排序：進球數 → 助攻數 → 上場時間（少者優先）。線條止於各球員最後進球的輪次；點選或滑過任一進球點可聚焦該球員。資料來源：FIFA / API-Football。<br><span id="update-time"></span>
     </div>
   </div>
 </div>
@@ -179,8 +179,9 @@ body { -webkit-tap-highlight-color: transparent; }
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
 
-// ── X-axis: the eight 2026 tournament rounds, in order. Keys match the
-// scorer_board round columns returned by getScorerBoard. ──
+// ── X-axis: the 2026 tournament rounds. The two medal matches share one
+// terminal column so finalist paths are not visually routed through the
+// third-place match. ──
 const ROUNDS = [
   { key: 'gs1',   label: '小組賽 M1' },
   { key: 'gs2',   label: '小組賽 M2' },
@@ -189,10 +190,16 @@ const ROUNDS = [
   { key: 'r16',   label: '16強' },
   { key: 'r8',    label: '8強' },
   { key: 'r4',    label: '4強' },
-  { key: 'final', label: '決賽' },
+  { key: 'medal', label: ['冠軍賽', '季軍賽'] },
 ];
 const ROUND_IDX = {};
 ROUNDS.forEach((r, i) => { ROUND_IDX[r.key] = i; });
+ROUND_IDX.third = ROUND_IDX.medal;
+ROUND_IDX.final = ROUND_IDX.medal;
+function displayRoundLabel(idx) {
+  const label = ROUNDS[idx].label;
+  return Array.isArray(label) ? label.join(' / ') : label;
+}
 
 // ── Colour scheme: only the top 4 get vivid distinct colours; ranks 5–10 use a
 // ramp of grey tones — distinguishable from each other but visually secondary.
@@ -211,49 +218,124 @@ const FLAG_BY_CC = {
 };
 function flagEmoji(cc) { return FLAG_BY_CC[cc] || '🏳️'; }
 
-// ── Offline fallback — real top 10 as of R16 (goals/assists/minutes from FIFA
-// player statistics). Live getScorerBoard data overrides this on arrival.
-// assists + minutes are exact; per-round goals are a best-effort split that sums
-// to each player's real total (FIFA doesn't publish the per-round breakdown).
-// eliminated = team knocked out (SEN out at R32; MEX, BRA out at R16).
+const BRONZE_ROUND_COUNTRY_CODES = new Set(['FRA', 'ENG']);
+const PLAYER_ALIASES = {
+  messi: { code: 'messi', name: '梅西', cc: 'ARG' },
+  'lionel-messi': { code: 'messi', name: '梅西', cc: 'ARG' },
+  'lionel messi': { code: 'messi', name: '梅西', cc: 'ARG' },
+  '梅西': { code: 'messi', name: '梅西', cc: 'ARG' },
+  mbappe: { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  'kylian-mbappe': { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  'kylian mbappe': { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  '姆巴佩': { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  haaland: { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  'erling-haaland': { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  'erling haaland': { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  '哈蘭德': { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  bellingham: { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+  'jude-bellingham': { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+  'jude bellingham': { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+  '貝林翰': { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+};
+
+// ── Offline fallback — real top 10 as of the bronze-medal match (goals/assists/
+// minutes from FIFA player statistics). Live getScorerBoard data overrides this
+// on arrival. assists + minutes are exact; per-round goals are a best-effort
+// split that sums to each player's real total (FIFA doesn't publish the
+// per-round breakdown). The chart maps both medal matches into one terminal
+// X-axis column so readers do not infer finalists played the third-place match.
+// eliminated = team has no matches left (FRA/ENG's tournament ended at bronze;
+// NOR/SEN/MEX/BRA eliminated earlier). ARG/ESP remain active (final TBD).
 const FALLBACK = [
-  { name:'姆巴佩',    cc:'FRA', assists:2, minutes:482, rounds:{ gs1:2, gs2:2, gs3:0, r32:2, r16:1 } },
-  { name:'梅西',      cc:'ARG', assists:1, minutes:468, rounds:{ gs1:3, gs2:1, gs3:1, r32:2, r16:1 } },
-  { name:'哈蘭德',    cc:'NOR', assists:0, minutes:416, rounds:{ gs1:2, gs2:1, gs3:1, r32:1, r16:2 } },
-  { name:'凱恩',      cc:'ENG', assists:1, minutes:489, rounds:{ gs1:2, gs2:0, gs3:1, r32:2, r16:1 } },
-  { name:'登貝萊',    cc:'FRA', assists:2, minutes:391, rounds:{ gs2:1, gs3:3 } },
-  { name:'歐雅薩巴',  cc:'ESP', assists:1, minutes:435, rounds:{ gs2:2, r32:2 } },
-  { name:'薩爾',      cc:'SEN', assists:1, minutes:419, eliminated:true, rounds:{ gs2:2, gs3:1, r32:1 } },
-  { name:'基尼奧內斯', cc:'MEX', assists:1, minutes:440, eliminated:true, rounds:{ gs1:1, gs2:1, r32:1, r16:1 } },
-  { name:'貝林翰',     cc:'ENG', assists:1, minutes:447, rounds:{ gs1:1, gs3:1, r16:2 } },
-  { name:'維尼修斯',  cc:'BRA', assists:1, minutes:505, eliminated:true, rounds:{ gs1:1, gs2:1, gs3:2 } },
+  { name:'姆巴佩',      cc:'FRA', assists:4, minutes:769, eliminated:true,  rounds:{ gs1:2, gs2:2, r32:2, r16:1, r8:1, medal:2 } },
+  { name:'梅西',        cc:'ARG', assists:4, minutes:712, eliminated:false, rounds:{ gs1:3, gs2:1, gs3:1, r32:2, r16:1 } },
+  { name:'哈蘭德',      cc:'NOR', assists:0, minutes:537, eliminated:true,  rounds:{ gs1:2, gs2:1, gs3:1, r32:1, r16:2 } },
+  { name:'凱恩',        cc:'ENG', assists:1, minutes:732, eliminated:true,  rounds:{ gs1:2, gs3:1, r32:2, r16:1 } },
+  { name:'狄姆貝利',    cc:'FRA', assists:2, minutes:648, eliminated:true,  rounds:{ gs2:1, gs3:3, r8:1, medal:1 } },
+  { name:'奧亞爾薩巴爾', cc:'ESP', assists:1, minutes:599, eliminated:false, rounds:{ gs2:2, r32:2, r4:1 } },
+  { name:'薩爾',        cc:'SEN', assists:1, minutes:419, eliminated:true,  rounds:{ gs2:2, gs3:1, r32:1 } },
+  { name:'基尼奧內斯',  cc:'MEX', assists:1, minutes:440, eliminated:true,  rounds:{ gs1:1, gs2:1, r32:1, r16:1 } },
+  { name:'貝林翰',      cc:'ENG', assists:1, minutes:698, eliminated:true,  rounds:{ gs1:1, gs3:1, r16:2, r8:2, medal:1 } },
+  { name:'維尼修斯',    cc:'BRA', assists:1, minutes:505, eliminated:true,  rounds:{ gs1:1, gs2:1, gs3:2 } },
 ];
 
+// ── localStorage cache (survives tabs & sessions), mirroring wc2026-bracket.html ──
+const CACHE_TTL = 300; // seconds — GAS cold-start is expensive, cache longer
+function cacheGet(k) {
+  try {
+    const r = localStorage.getItem(k);
+    if (!r) return null;
+    const { ts, data } = JSON.parse(r);
+    return Date.now() - ts < CACHE_TTL * 1000 ? data : null;
+  } catch { return null; }
+}
+function cacheGetStale(k) {
+  // Returns cached data regardless of age (for instant first paint).
+  try {
+    const r = localStorage.getItem(k);
+    if (!r) return null;
+    return JSON.parse(r).data;
+  } catch { return null; }
+}
+function cacheSet(k, d) {
+  try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
+}
+
 async function fetchAction(action) {
+  const key = 'wc26_' + action;
+  const hit = cacheGet(key);
+  if (hit) return hit;
   const res = await fetch(GAS_URL + '?action=' + action);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json.status !== 'ok') throw new Error(json.message || 'API error');
-  return { data: json.data, updated: json.updated || null };
+  const result = { data: json.data, updated: json.updated || null };
+  cacheSet(key, result);
+  return result;
 }
 
 // ── Map getScorerBoard rows → chart players (goals already bucketed by round) ──
+function aliasKey(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function rowQuality(row) {
+  const hasChineseName = /[\u4e00-\u9fff]/.test(String(row.name || '')) ? 1 : 0;
+  return (Number(row.minutes) || 0) * 1000 +
+    (Number(row.assists) || 0) * 100 +
+    (hasChineseName * 10) +
+    Object.keys(row.rounds || {}).length;
+}
+
 function buildFromBoard(rows) {
-  return (rows || []).map(p => {
+  const byCode = {};
+  for (const p of (rows || [])) {
     const rounds = {};
     for (const [k, g] of Object.entries(p.rounds || {})) {
       const n = Number(g) || 0;
-      if (n > 0 && ROUND_IDX[k] != null) rounds[k] = n;
+      if (n > 0 && ROUND_IDX[k] != null) {
+        const key = (k === 'third' || k === 'final') ? 'medal' : k;
+        rounds[key] = (rounds[key] || 0) + n;
+      }
     }
-    return {
-      name: p.player_name || p.player_code || '',
-      cc: p.country_code || '',
+    const cc = String(p.country_code || '').trim().toUpperCase();
+    const alias = PLAYER_ALIASES[aliasKey(p.player_code)] || PLAYER_ALIASES[aliasKey(p.player_name)];
+    const row = {
+      code: alias ? alias.code : (p.player_code || p.player_name || ''),
+      name: alias ? alias.name : (p.player_name || p.player_code || ''),
+      cc: alias ? alias.cc : cc,
       assists: Number(p.assists) || 0,
       minutes: Number(p.minutes) || 0,
       eliminated: !!p.eliminated,
       rounds,
     };
-  });
+    if (!byCode[row.code] || rowQuality(row) > rowQuality(byCode[row.code])) byCode[row.code] = row;
+  }
+  return Object.values(byCode);
 }
 
 // ── Golden Boot ranking: goals ↓, assists ↓, minutes ↑; take top 10 scorers ──
@@ -273,6 +355,11 @@ function rankTop10(players) {
     p.flag = flagEmoji(p.cc);
   });
   return top;
+}
+
+function hasBronzeRoundData(players) {
+  return players.some(p =>
+    BRONZE_ROUND_COUNTRY_CODES.has(p.cc) && Number((p.rounds || {}).medal) > 0);
 }
 
 // ── Chart geometry ──
@@ -316,7 +403,7 @@ const ttGoal = tt.querySelector('.tt-goals');
 function ttShow(e, dot, playerName, playerColor) {
   ttName.textContent = playerName;
   ttName.style.color = playerColor;
-  ttYear.textContent = ROUNDS[dot.idx].label;
+  ttYear.textContent = displayRoundLabel(dot.idx);
   ttGoal.textContent = `本輪 ${dot.roundGoals} 球・累計 ${dot.cum} 球`;
   tt.style.display = 'block';
   ttMove(e);
@@ -416,10 +503,14 @@ function render(top, opts) {
       stroke:'rgba(15,50,96,0.05)', 'stroke-width':0.8 }, axG);
     mk('line', { x1:f(x), y1:MT+PH, x2:f(x), y2:MT+PH+5,
       stroke:'#cbd5e1', 'stroke-width':0.8 }, axG);
-    txt(ROUNDS[i].label, {
-      x: f(x), y: MT + PH + 16,
-      'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '9.5',
-    }, axG);
+    const label = ROUNDS[i].label;
+    const lines = Array.isArray(label) ? label : [label];
+    lines.forEach((line, lineIdx) => {
+      txt(line, {
+        x: f(x), y: MT + PH + 16 + lineIdx * 12,
+        'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '9.5',
+      }, axG);
+    });
   }
 
   // ── Build paths ──
@@ -608,9 +699,9 @@ let animating = false;
 let animEndTimer = null;
 let pendingRender = null;   // live data waiting for the draw-on to finish
 
-// The line chart keeps only Golden-Boot contenders (team not eliminated, so they
-// can still add goals); the table below still shows the full top-10 standings.
-const contenders = top => top.filter(p => !p.eliminated);
+// The line chart and table both show the complete top-10 board in this roundup
+// variant so the label layout matches the published static snapshot.
+const contenders = top => top;
 function drawOn(top)     { render(contenders(top), { animate: true });  renderTable(top); postHeight(); }
 function drawStatic(top) { render(contenders(top), { animate: false }); renderTable(top); postHeight(); }
 
@@ -648,21 +739,31 @@ function updateTimestamp(isoStr) {
 }
 
 async function main() {
-  // Play the smooth draw-on ONCE on load, using the offline fallback so the
-  // chart animates immediately and is never blank while GAS is in flight.
-  drawOn(rankTop10(FALLBACK));
-  updateTimestamp();
+  // Play the smooth draw-on ONCE on load. Prefer any cached data (even stale)
+  // over the hardcoded fallback so the first paint is never blank AND is the
+  // most accurate data we have, mirroring wc2026-bracket.html's renderFromCache().
+  const stale = cacheGetStale('wc26_getScorerBoard');
+  const fallback = rankTop10(FALLBACK);
+  if (stale) {
+    const cached = rankTop10(buildFromBoard(stale.data));
+    drawOn(hasBronzeRoundData(cached) ? cached : fallback);
+    updateTimestamp(stale.updated);
+  } else {
+    drawOn(fallback);
+    updateTimestamp();
+  }
   try {
     const result = await fetchAction('getScorerBoard');
     const live = rankTop10(buildFromBoard(result.data));
     if (!live.length) return;
+    if (!hasBronzeRoundData(live)) return;
     // Swap in live data WITHOUT a second animation. If the draw-on is still
     // running, defer until it finishes so it isn't cut short.
     if (animating) pendingRender = live;
     else drawStatic(live);
     updateTimestamp(result.updated);
   } catch (e) {
-    // GAS unavailable — the fallback draw-on already ran
+    // GAS unavailable — keep whatever was already painted (cache or fallback)
   }
 }
 

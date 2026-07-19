@@ -1522,7 +1522,7 @@ function computeTopScorers_() {
 const BOARD_ROUNDS = [
   { key: 'gs1', label: '小組賽M1' }, { key: 'gs2', label: '小組賽M2' }, { key: 'gs3', label: '小組賽M3' },
   { key: 'r32', label: '32強' }, { key: 'r16', label: '16強' }, { key: 'r8', label: '8強' },
-  { key: 'r4',  label: '4強' }, { key: 'final', label: '決賽' },
+  { key: 'r4',  label: '4強' }, { key: 'third', label: '季軍賽' }, { key: 'final', label: '決賽' },
 ];
 const BOARD_HEADERS = ['player_code', 'player_name', 'country_code']
   .concat(BOARD_ROUNDS.map(r => r.label))
