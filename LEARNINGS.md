@@ -385,3 +385,87 @@ const labelX = i < WC_YEARS.length - 1
 
 **教訓**：凡是靠外部 API 才能渲染的頁面，都應採用「先渲染 fallback，API 回來再更新」的模式（Stale-While-Revalidate）。GAS 的冷啟動不可控，不應讓使用者的首屏體驗依賴它。
 
+---
+
+## 34. Y 軸最大值寫死常數，實際資料超過時整條線被裁切在圖表外
+
+**問題**：`wc2026-scorers-lines.html` 的 `MAX_Y` 原本是模組層級的固定常數 `20`。當梅西的累計進球衝到 21 球，他的折線與端點標籤直接被裁到繪圖區上緣之外，畫面上完全看不出任何錯誤或警告。
+
+**原因**：Y 軸刻度上限用「假設資料不會超過的天花板」寫死，而不是每次渲染時依實際資料重新計算；直播資料（累計進球）會隨時間持續往上長，寫死的常數遲早被打破。
+
+**解法**：把 `MAX_Y` 移進 `render()`，依當次 `computed` 資料算出最大累計值，無條件進位到下一個刻度並保留至少一格 headroom：
+```js
+const maxCareerY = Math.max(0, ...Object.values(computed).map(p => p.endY || 0));
+const TICK_STEP = maxCareerY > 30 ? 5 : 2;
+let MAX_Y = Math.ceil(maxCareerY / TICK_STEP) * TICK_STEP;
+if (MAX_Y - maxCareerY < TICK_STEP) MAX_Y += TICK_STEP;
+const cy = g => MT + PH - (g / MAX_Y) * PH;   // 每次 render 用區域變數，蓋過外層常數
+```
+
+---
+
+## 35. 端點標籤「碰撞就往下推 16px」沒有下限，多人同分時整批被推出畫布
+
+**問題**：同一張折線圖裡，只要有 4 名以上球員的累計總數「剛好相同」（例如都卡在 5 球門檻），端點標籤（國旗＋姓名＋球數）在 collision-avoidance 迴圈裡被逐一往下推 16px，越推越低，最後幾名球員的標籤 y 座標超過繪圖區下緣（甚至超過整個 SVG viewBox 高度），在畫面上直接消失。
+
+**原因**：碰撞解決演算法只有「往下推」這個方向、沒有終點檢查——它假設可用垂直空間永遠夠推滿所有標籤，但當同分／相近分的人數一多，累加的推擠量會超出實際版面。
+
+**解法**：往下推完後，若最後一個標籤仍超出繪圖區下緣（`MT + PH`），把它夾回邊界，再由下往上做第二輪回推，確保每個標籤與下面相鄰標籤間至少保留 gap：
+```js
+const last = endLabels[endLabels.length - 1];
+if (last.y > labelMaxY) {
+  last.y = labelMaxY;
+  for (let i = endLabels.length - 2; i >= 0; i--) {
+    if (endLabels[i + 1].y - endLabels[i].y < LABEL_GAP) {
+      endLabels[i].y = endLabels[i + 1].y - LABEL_GAP;
+    }
+  }
+}
+```
+
+---
+
+## 36. 端點標籤姓名字數沒驗證寬度，長 CJK 名字把球數數字擠出 SVG viewBox 而被裁掉
+
+**問題**：新加入的球員 Oyarzabal（奧亞爾薩巴爾，6 個中文字，是全部球員裡最長的名字）端點標籤的「球數」數字完全沒有顯示，只看到殘缺的名字。
+
+**原因**：端點標籤固定畫在 `cx_year(最後一屆) + 8` 之後、右邊界留白 `MR = 110px`，這個留白量是照當時最長名字（4–5 字）抓的，姓名寬度用 `estTextWidth` 估算後接著畫「球數」，從未檢查總寬度是否超過 SVG 的 `viewBox`（720px 寬）。一旦超過，SVG 根元素預設會直接裁掉超界內容——球數數字剛好落在裁切線外，靜默消失，沒有任何錯誤。
+
+**解法**：畫名字前先算出「扣掉球數寬度後，名字還剩多少可用寬度」，超過就從尾端逐字裁掉，球數數字永遠留到最後才裁（球數是資訊重點，不能被裁）：
+```js
+const availForName = LABEL_RIGHT_SAFE - nameX - goalGap - goalW;
+let name = lbl.name;
+while (name.length > 1 && estTextWidth(name, LBL_FS) > availForName) {
+  name = name.slice(0, -1);
+}
+```
+
+---
+
+## 37. 「快速 CSV 補丁」只能更新既有球員，無法把新晉球員加進圖表——離線 fallback 沒同步時新人整個消失
+
+**問題**：2026 賽事新增兩名達標球員 Dembélé、Oyarzabal（累計進球都達到「5 球以上」的收錄門檻），在 `wc2026-scorers-lines.html` 完全沒有出現，不是位置錯誤或裁切，而是壓根不在圖表資料裡。
+
+**原因**：`main()` 的第二步 `fetchSheet2026()` + `applySheet2026()` 是「快速路徑」，只會巡覽既有 `PLAYERS` 物件的 key、幫每個既有球員補上 2026 進球數，邏輯上不可能新增一個原本沒有的球員。硬編碼的離線 fallback `PLAYERS`/`META`/`PLAYER_ID_MAP` 距離上次同步已經 11 天（comment 標記 `Last synced: 2026-07-08`，今天 07-19），完全不知道這兩名新球員存在。只有第三步、較慢的 `fetchScorerRace()`（真正打 GAS）成功時才補得進來——一旦 GAS 冷啟動慢或暫時失敗，新球員就整場消失，而且沒有任何錯誤訊息提示。
+
+**解法**：直接 `curl` GAS 的 `getScorerRace` 與 Sheet CSV，和硬編碼物件逐一 diff，把新球員、變動過的既有數字都同步進 `PLAYERS`/`META`/`PLAYER_ID_MAP`/`FLAG_BY_CC`（含國旗、專屬顏色），並把 `Last synced` 註解更新為當天日期。`wc2026-scorers.html`、`wc2026-scorers-bars.html` 是各自獨立維護同樣結構的 fallback，修一份時該檢查另外幾份是否也有相同的缺口（呼應 #29/#30/#33，但這次的癥結是「整個實體消失」而非「數字過期」）。
+
+---
+
+## 38. 同名 HTML 副本與賽制語意：決賽／季軍賽不能畫成兩個連續階段
+
+**問題**：`wc2026-scorers-rounds-endlabel-v4.html` 主檔已改成「冠軍賽／季軍賽」共用同一個終點欄位，但前端截圖仍顯示舊的單獨 `決賽` 欄，且 live data 出現 `Lionel Messi`、`Kylian Mbappé` 等英文重複列。看起來像 GAS 或 localStorage 一直覆蓋前端，實際上使用者開的是 `Archive 2/wc2026-scorers-rounds-endlabel-v4.html` 這份同名副本。
+
+**原因**：
+- 專案裡有多份同名或近似用途的 HTML，包含根目錄主檔與 `Archive 2/` 副本；只改主檔時，使用者若載入 archive 副本就完全看不到變更。
+- X 軸若把 `季軍賽` 放在 `決賽` 前一格，會被讀者誤讀成所有球員都先經過季軍賽再到決賽，例如梅西路徑看起來像「有經過季軍賽」。
+- `scorer_board` live data 可能缺季軍欄，或有英文／中文重複球員列；若無條件用 live data 覆蓋 fallback，前端會重新出現舊錯誤。
+
+**解法**：
+- 先確認實際載入檔案：在瀏覽器 console 跑 `location.href` 與 `document.documentElement.innerHTML.includes('冠軍賽')`，不要只看本地正在編輯的主檔。
+- 用 `rg -n "wc2026-scorers-rounds-endlabel-v4|冠軍賽|決賽" . -g "*.html"` 找出所有副本，一次同步真正被載入的檔案。
+- 將最後 X 軸改成單一 `medal` 欄位，標籤分兩行顯示 `冠軍賽`、`季軍賽`；資料映射中 `third` / `final` 都折到同一個 `medal` X 座標，避免產生前後順序誤讀。
+- 前端與 GAS 都加入 player alias 去重，`Lionel Messi` → `梅西`、`Kylian Mbappé` → `姆巴佩`、`Erling Haaland` → `哈蘭德`、`Jude Bellingham` → `貝林翰`，同一球員只保留資料較完整的列。
+- 當 live/cached API 沒有可用的 medal/季軍資料時，不要讓它覆蓋已同步的 fallback；先保留可正確呈現的靜態 snapshot。
+
+**教訓**：前端「一直沒變」時，第一步不是再改資料邏輯，而是證明瀏覽器載入的是哪一份 HTML。對賽制圖表，X 軸不只是資料欄位，也是敘事語意；同一天發生的冠軍賽／季軍賽應共用終點欄位，而不是畫成會讓讀者誤會的連續流程。

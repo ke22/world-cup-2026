@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>2026 世界盃射手榜・逐輪累計（線末標籤版）</title>
+<style>
+/* ── CNA Design System Variables ── */
+:root {
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --fg: #1f2937;
+  --muted: #66758a;
+  --border: rgba(15, 50, 96, 0.12);
+  --shadow: rgba(15, 75, 143, 0.08);
+  --accent: #0f4b8f;
+  --accent-2: #2c73c9;
+  --header-from: #13579f;
+  --header-to: #0f4b8f;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC",
+    "Microsoft JhengHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.wrapper { max-width: 800px; margin: 0 auto; padding: 10px; }
+
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px var(--shadow);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, var(--header-from) 0%, var(--header-to) 100%);
+  border-radius: 16px 16px 0 0;
+  gap: 12px;
+}
+.cna-logo { height: 24px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+.header-title { font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: 0.2px; }
+
+/* ── Chart ── */
+.chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 16px 8px 4px; }
+.chart-scroll svg { display: block; min-width: 600px; height: auto; }
+
+/* ── Data table ── */
+.table-wrap { padding: 4px 12px 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#scorer-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#scorer-table thead th {
+  text-align: right; font-weight: 700; color: #4b5563;
+  padding: 8px 10px; border-bottom: 2px solid var(--border);
+  font-size: 12px; white-space: nowrap;
+}
+#scorer-table th.col-rank { text-align: center; width: 36px; }
+#scorer-table th.col-player { text-align: left; }
+#scorer-table tbody td {
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+#scorer-table tbody tr:nth-child(even) { background: var(--surface-2); }
+#scorer-table .td-rank { text-align: center; color: #4b5563; font-weight: 700; }
+#scorer-table .td-player { text-align: left; white-space: nowrap; }
+#scorer-table .td-goals { font-weight: 700; color: #4b5563; }
+#scorer-table .p-flag { width: 18px; height: 18px; vertical-align: -3px; margin-right: 7px; }
+#scorer-table .p-name { font-weight: 700; color: #4b5563; }
+#scorer-table .p-cc { color: #4b5563; font-size: 11.5px; margin-left: 6px; }
+
+/* ── Note ── */
+.note-row {
+  padding: 6px 18px 14px;
+  font-size: 11.5px; color: #94a3b8; line-height: 1.55;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Hover tooltip ── */
+#tt {
+  position: fixed;
+  pointer-events: none;
+  z-index: 200;
+  display: none;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 130px;
+  box-shadow: 0 6px 24px rgba(15, 50, 96, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.tt-name  { font-size: 13.5px; font-weight: 700; color: #1f2937; }
+.tt-year  { font-size: 11.5px; color: #64748b; margin-top: 2px; }
+.tt-goals { font-size: 13px; font-variant-numeric: tabular-nums; color: #2c73c9; margin-top: 5px; }
+.tt-sep   { width: 100%; height: 1px; background: rgba(15, 50, 96, 0.12); margin: 6px 0; }
+
+/* ── Touch / mobile ── */
+body { -webkit-tap-highlight-color: transparent; }
+.chart-scroll svg { touch-action: pan-x pan-y; }
+#scorer-table .p-name, .header-title { -webkit-user-select: none; user-select: none; }
+
+@media (max-width: 640px) {
+  body { font-size: 14px; }
+  .wrapper { padding: 6px; }
+  .panel { border-radius: 12px; }
+  .header { padding: 12px 14px; border-radius: 12px 12px 0 0; gap: 10px; }
+  .header-title { font-size: 0.98rem; }
+  .cna-logo { height: 20px; }
+  .chart-scroll { padding: 12px 6px 2px; }
+  .chart-scroll svg { min-width: 560px; }        /* keep text legible; scroll sideways */
+  .table-wrap { padding: 4px 8px 8px; }
+  #scorer-table { font-size: 12.5px; }
+  #scorer-table thead th { padding: 7px 6px; font-size: 11px; }
+  #scorer-table tbody td { padding: 7px 6px; }
+  #scorer-table th.col-rank { width: 26px; }
+  #scorer-table .p-flag { width: 16px; height: 16px; margin-right: 5px; }
+  #scorer-table .p-cc { font-size: 10.5px; margin-left: 4px; }
+  .note-row { padding: 6px 12px 12px; font-size: 11px; }
+  /* bigger, easier-to-read tooltip on touch */
+  #tt { padding: 9px 12px; min-width: 120px; }
+  .tt-name { font-size: 14px; } .tt-year { font-size: 12px; } .tt-goals { font-size: 13.5px; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="panel">
+    <div class="header">
+      <img src="https://imgcdn.cna.com.tw/embed/wc2026/cna_logo.svg" class="cna-logo" alt="CNA">
+      <span class="header-title">2026 世界盃射手榜・逐輪累計進球</span>
+    </div>
+
+    <div class="chart-scroll">
+      <svg id="chart" viewBox="0 0 720 440" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="table-wrap">
+      <table id="scorer-table" aria-label="2026 世界盃射手榜">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="col-player">球員</th>
+            <th class="col-num">進球</th>
+            <th class="col-num">助攻</th>
+            <th class="col-num">上場時間</th>
+          </tr>
+        </thead>
+        <tbody id="scorer-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="note-row">
+      X 軸為賽事輪次、Y 軸為累計進球；下方表格為完整前 10 名。名次依國際足總金靴獎規則排序：進球數 → 助攻數 → 上場時間（少者優先）。線條止於各球員最後進球的輪次；點選或滑過任一進球點可聚焦該球員。資料來源：FIFA / API-Football。<br><span id="update-time"></span>
+    </div>
+  </div>
+</div>
+
+<div id="tt">
+  <div class="tt-name"></div>
+  <div class="tt-year"></div>
+  <div class="tt-sep"></div>
+  <div class="tt-goals"></div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+
+// ── X-axis: the 2026 tournament rounds. The two medal matches share one
+// terminal column so finalist paths are not visually routed through the
+// third-place match. ──
+const ROUNDS = [
+  { key: 'gs1',   label: '小組賽 M1' },
+  { key: 'gs2',   label: '小組賽 M2' },
+  { key: 'gs3',   label: '小組賽 M3' },
+  { key: 'r32',   label: '32強' },
+  { key: 'r16',   label: '16強' },
+  { key: 'r8',    label: '8強' },
+  { key: 'r4',    label: '4強' },
+  { key: 'medal', label: ['冠軍賽', '季軍賽'] },
+];
+const ROUND_IDX = {};
+ROUNDS.forEach((r, i) => { ROUND_IDX[r.key] = i; });
+ROUND_IDX.third = ROUND_IDX.medal;
+ROUND_IDX.final = ROUND_IDX.medal;
+function displayRoundLabel(idx) {
+  const label = ROUNDS[idx].label;
+  return Array.isArray(label) ? label.join(' / ') : label;
+}
+
+// ── Colour scheme: only the top 4 get vivid distinct colours; ranks 5–10 use a
+// ramp of grey tones — distinguishable from each other but visually secondary.
+const TOP_COLORS = ['#D32F2F', '#1565C0', '#2E7D32', '#F9A825'];
+const GREY_RAMP = ['#54606e', '#6b7280', '#7f8894', '#949cA6', '#a8afb8', '#bcc2ca'];
+function rankColor(i) { return i < 4 ? TOP_COLORS[i] : GREY_RAMP[(i - 4) % GREY_RAMP.length]; }
+
+// Flag by country_code (twemoji SVG from local emoji/ folder), mirroring the
+// lines chart. Unmapped codes fall back to a neutral white flag.
+const FLAG_BY_CC = {
+  ARG:'🇦🇷', FRA:'🇫🇷', POR:'🇵🇹', ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', BRA:'🇧🇷',
+  ECU:'🇪🇨', COL:'🇨🇴', BEL:'🇧🇪', CRO:'🇭🇷', NED:'🇳🇱', NOR:'🇳🇴',
+  SEN:'🇸🇳', GER:'🇩🇪', ESP:'🇪🇸', ITA:'🇮🇹', USA:'🇺🇸', MEX:'🇲🇽',
+  CAN:'🇨🇦', JPN:'🇯🇵', KOR:'🇰🇷', MAR:'🇲🇦', URU:'🇺🇾', SUI:'🇨🇭',
+  DEN:'🇩🇰', POL:'🇵🇱', AUS:'🇦🇺', GHA:'🇬🇭', PAN:'🇵🇦', KSA:'🇸🇦',
+};
+function flagEmoji(cc) { return FLAG_BY_CC[cc] || '🏳️'; }
+
+const BRONZE_ROUND_COUNTRY_CODES = new Set(['FRA', 'ENG']);
+const PLAYER_ALIASES = {
+  messi: { code: 'messi', name: '梅西', cc: 'ARG' },
+  'lionel-messi': { code: 'messi', name: '梅西', cc: 'ARG' },
+  'lionel messi': { code: 'messi', name: '梅西', cc: 'ARG' },
+  '梅西': { code: 'messi', name: '梅西', cc: 'ARG' },
+  mbappe: { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  'kylian-mbappe': { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  'kylian mbappe': { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  '姆巴佩': { code: 'mbappe', name: '姆巴佩', cc: 'FRA' },
+  haaland: { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  'erling-haaland': { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  'erling haaland': { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  '哈蘭德': { code: 'haaland', name: '哈蘭德', cc: 'NOR' },
+  bellingham: { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+  'jude-bellingham': { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+  'jude bellingham': { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+  '貝林翰': { code: 'bellingham', name: '貝林翰', cc: 'ENG' },
+};
+
+// ── Offline fallback — real top 10 as of the bronze-medal match (goals/assists/
+// minutes from FIFA player statistics). Live getScorerBoard data overrides this
+// on arrival. assists + minutes are exact; per-round goals are a best-effort
+// split that sums to each player's real total (FIFA doesn't publish the
+// per-round breakdown). The chart maps both medal matches into one terminal
+// X-axis column so readers do not infer finalists played the third-place match.
+// eliminated = team has no matches left (FRA/ENG's tournament ended at bronze;
+// NOR/SEN/MEX/BRA eliminated earlier). ARG/ESP remain active (final TBD).
+const FALLBACK = [
+  { name:'姆巴佩',      cc:'FRA', assists:4, minutes:769, eliminated:true,  rounds:{ gs1:2, gs2:2, r32:2, r16:1, r8:1, medal:2 } },
+  { name:'梅西',        cc:'ARG', assists:4, minutes:712, eliminated:false, rounds:{ gs1:3, gs2:1, gs3:1, r32:2, r16:1 } },
+  { name:'哈蘭德',      cc:'NOR', assists:0, minutes:537, eliminated:true,  rounds:{ gs1:2, gs2:1, gs3:1, r32:1, r16:2 } },
+  { name:'凱恩',        cc:'ENG', assists:1, minutes:732, eliminated:true,  rounds:{ gs1:2, gs3:1, r32:2, r16:1 } },
+  { name:'狄姆貝利',    cc:'FRA', assists:2, minutes:648, eliminated:true,  rounds:{ gs2:1, gs3:3, r8:1, medal:1 } },
+  { name:'奧亞爾薩巴爾', cc:'ESP', assists:1, minutes:599, eliminated:false, rounds:{ gs2:2, r32:2, r4:1 } },
+  { name:'薩爾',        cc:'SEN', assists:1, minutes:419, eliminated:true,  rounds:{ gs2:2, gs3:1, r32:1 } },
+  { name:'基尼奧內斯',  cc:'MEX', assists:1, minutes:440, eliminated:true,  rounds:{ gs1:1, gs2:1, r32:1, r16:1 } },
+  { name:'貝林翰',      cc:'ENG', assists:1, minutes:698, eliminated:true,  rounds:{ gs1:1, gs3:1, r16:2, r8:2, medal:1 } },
+  { name:'維尼修斯',    cc:'BRA', assists:1, minutes:505, eliminated:true,  rounds:{ gs1:1, gs2:1, gs3:2 } },
+];
+
+// ── localStorage cache (survives tabs & sessions), mirroring wc2026-bracket.html ──
+const CACHE_TTL = 300; // seconds — GAS cold-start is expensive, cache longer
+function cacheGet(k) {
+  try {
+    const r = localStorage.getItem(k);
+    if (!r) return null;
+    const { ts, data } = JSON.parse(r);
+    return Date.now() - ts < CACHE_TTL * 1000 ? data : null;
+  } catch { return null; }
+}
+function cacheGetStale(k) {
+  // Returns cached data regardless of age (for instant first paint).
+  try {
+    const r = localStorage.getItem(k);
+    if (!r) return null;
+    return JSON.parse(r).data;
+  } catch { return null; }
+}
+function cacheSet(k, d) {
+  try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
+}
+
+async function fetchAction(action) {
+  const key = 'wc26_' + action;
+  const hit = cacheGet(key);
+  if (hit) return hit;
+  const res = await fetch(GAS_URL + '?action=' + action);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.status !== 'ok') throw new Error(json.message || 'API error');
+  const result = { data: json.data, updated: json.updated || null };
+  cacheSet(key, result);
+  return result;
+}
+
+// ── Map getScorerBoard rows → chart players (goals already bucketed by round) ──
+function aliasKey(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function rowQuality(row) {
+  const hasChineseName = /[\u4e00-\u9fff]/.test(String(row.name || '')) ? 1 : 0;
+  return (Number(row.minutes) || 0) * 1000 +
+    (Number(row.assists) || 0) * 100 +
+    (hasChineseName * 10) +
+    Object.keys(row.rounds || {}).length;
+}
+
+function buildFromBoard(rows) {
+  const byCode = {};
+  for (const p of (rows || [])) {
+    const rounds = {};
+    for (const [k, g] of Object.entries(p.rounds || {})) {
+      const n = Number(g) || 0;
+      if (n > 0 && ROUND_IDX[k] != null) {
+        const key = (k === 'third' || k === 'final') ? 'medal' : k;
+        rounds[key] = (rounds[key] || 0) + n;
+      }
+    }
+    const cc = String(p.country_code || '').trim().toUpperCase();
+    const alias = PLAYER_ALIASES[aliasKey(p.player_code)] || PLAYER_ALIASES[aliasKey(p.player_name)];
+    const row = {
+      code: alias ? alias.code : (p.player_code || p.player_name || ''),
+      name: alias ? alias.name : (p.player_name || p.player_code || ''),
+      cc: alias ? alias.cc : cc,
+      assists: Number(p.assists) || 0,
+      minutes: Number(p.minutes) || 0,
+      eliminated: !!p.eliminated,
+      rounds,
+    };
+    if (!byCode[row.code] || rowQuality(row) > rowQuality(byCode[row.code])) byCode[row.code] = row;
+  }
+  return Object.values(byCode);
+}
+
+// ── Golden Boot ranking: goals ↓, assists ↓, minutes ↑; take top 10 scorers ──
+function rankTop10(players) {
+  const enriched = players.map(p => ({
+    ...p,
+    total: Object.values(p.rounds).reduce((a, b) => a + (Number(b) || 0), 0),
+  }));
+  enriched.sort((a, b) =>
+    b.total - a.total ||
+    (b.assists || 0) - (a.assists || 0) ||
+    (a.minutes || 0) - (b.minutes || 0));
+  const top = enriched.filter(p => p.total > 0).slice(0, 10);
+  top.forEach((p, i) => {
+    p.rank = i + 1;
+    p.color = rankColor(i);
+    p.flag = flagEmoji(p.cc);
+  });
+  return top;
+}
+
+function hasBronzeRoundData(players) {
+  return players.some(p =>
+    BRONZE_ROUND_COUNTRY_CODES.has(p.cc) && Number((p.rounds || {}).medal) > 0);
+}
+
+// ── Chart geometry ──
+const VW = 720, VH = 440;
+const ML = 40, MT = 28, MR = 120, MB = 52;
+const PW = VW - ML - MR;
+const PH = VH - MT - MB;
+
+function cx_round(i) { return ML + (i / (ROUNDS.length - 1)) * PW; }
+const f = n => (Math.round(n * 100) / 100).toString();
+
+// ── Build a player's step-line points + scoring dots over the round axis ──
+// The line spans from the player's first scoring round to their last scoring
+// round (their visible extent — later rounds they did not reach are not drawn).
+function buildStepPath(player, cyFn) {
+  const idxs = Object.keys(player.rounds)
+    .filter(k => player.rounds[k] > 0 && ROUND_IDX[k] != null)
+    .map(k => ROUND_IDX[k])
+    .sort((a, b) => a - b);
+  if (!idxs.length) return { pts: [], dots: [], endIdx: 0, endCum: 0 };
+
+  const firstIdx = idxs[0], lastIdx = idxs[idxs.length - 1];
+  let cum = 0;
+  const pts = [[firstIdx, 0]];
+  const dots = [];
+  for (let i = firstIdx; i <= lastIdx; i++) {
+    const key = ROUNDS[i].key;
+    const g = player.rounds[key] || 0;
+    if (i > firstIdx) pts.push([i, cum]);   // carry flat into this round
+    if (g > 0) { cum += g; pts.push([i, cum]); dots.push({ idx: i, roundGoals: g, cum }); }
+  }
+  return { pts, dots, endIdx: lastIdx, endCum: cum };
+}
+
+// ── Tooltip ──
+const tt     = document.getElementById('tt');
+const ttName = tt.querySelector('.tt-name');
+const ttYear = tt.querySelector('.tt-year');
+const ttGoal = tt.querySelector('.tt-goals');
+
+function ttShow(e, dot, playerName, playerColor) {
+  ttName.textContent = playerName;
+  ttName.style.color = playerColor;
+  ttYear.textContent = displayRoundLabel(dot.idx);
+  ttGoal.textContent = `本輪 ${dot.roundGoals} 球・累計 ${dot.cum} 球`;
+  tt.style.display = 'block';
+  ttMove(e);
+}
+function ttMove(e) {
+  const src = e.touches ? e.touches[0] : e;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = tt.offsetWidth || 170, h = tt.offsetHeight || 80;
+  let left = src.clientX + 16, top = src.clientY - 12;
+  if (left + w > vw - 8) left = src.clientX - w - 16;
+  if (top + h > vh - 8)  top  = src.clientY - h + 12;
+  tt.style.left = left + 'px';
+  tt.style.top  = top  + 'px';
+}
+function ttHide() { tt.style.display = 'none'; }
+
+// Tracks the player currently emphasised by a tap so a new tap (or a tap on
+// empty chart area) can reset it — on touch there is no mouseleave.
+let activeHiOff = null;
+function clearActive() { if (activeHiOff) activeHiOff(); ttHide(); }
+
+// ── SVG helpers ──
+const NS = 'http://www.w3.org/2000/svg';
+function mk(tag, attrs, parent) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  parent && parent.appendChild(el);
+  return el;
+}
+function txt(str, attrs, parent) {
+  const el = mk('text', attrs, parent);
+  el.textContent = str;
+  return el;
+}
+
+// ── Flag helpers (twemoji SVG from local emoji/ folder) ──
+function emojiToCodePoint(emoji) {
+  const pts = [];
+  for (const ch of emoji) {
+    const cp = ch.codePointAt(0).toString(16);
+    if (cp !== 'fe0f') pts.push(cp);
+  }
+  return pts.join('-');
+}
+function flagHref(emoji) { return `https://imgcdn.cna.com.tw/embed/wc2026/emoji/${emojiToCodePoint(emoji)}.svg`; }
+
+function estTextWidth(str, fs) {
+  let w = 0;
+  for (const ch of str) w += (ch.codePointAt(0) > 0x2e80 ? fs : fs * 0.55);
+  return w;
+}
+
+// ── Render ──
+// opts.animate = true runs a one-time smooth stroke draw-on (lines draw
+// left→right, dots + labels fade in as they settle). Otherwise the full static
+// chart is drawn immediately.
+function render(top, opts) {
+  opts = opts || {};
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+
+  const bgRect = mk('rect', { x:0, y:0, width:VW, height:VH, fill:'#fff' }, svg);
+  bgRect.addEventListener('touchstart', clearActive);   // tap empty area dismisses
+  bgRect.addEventListener('mousedown', clearActive);
+  mk('rect', { x:ML, y:MT, width:PW, height:PH, fill:'rgba(240,244,249,0.45)', rx:2 }, svg);
+
+  // Dynamic Y scale from the highest cumulative total on screen (min 6, even).
+  const maxTotal = top.reduce((m, p) => Math.max(m, p.total), 0);
+  const MAX_Y = Math.max(6, Math.ceil(maxTotal / 2) * 2);
+  const cy = g => MT + PH - (g / MAX_Y) * PH;
+  const yStep = MAX_Y <= 8 ? 1 : 2;
+
+  // ── Y-axis grid ──
+  const gridG = mk('g', {}, svg);
+  for (let g = 0; g <= MAX_Y; g += yStep) {
+    const y = cy(g);
+    mk('line', {
+      x1: ML, y1: f(y), x2: ML + PW, y2: f(y),
+      stroke: g === 0 ? 'rgba(15,50,96,0.2)' : 'rgba(15,50,96,0.06)',
+      'stroke-width': g === 0 ? 1.2 : 0.7,
+    }, gridG);
+    if (g > 0) {
+      txt(String(g), {
+        x: ML - 6, y: f(y + 4),
+        'text-anchor': 'end', fill: '#94a3b8', 'font-size': '10.5',
+        'font-variant-numeric': 'tabular-nums',
+      }, gridG);
+    }
+  }
+  mk('line', { x1:ML, y1:MT, x2:ML, y2:MT+PH, stroke:'rgba(15,50,96,0.15)', 'stroke-width':1 }, gridG);
+
+  // ── X-axis (rounds) ──
+  const axG = mk('g', {}, svg);
+  for (let i = 0; i < ROUNDS.length; i++) {
+    const x = cx_round(i);
+    mk('line', { x1:f(x), y1:MT, x2:f(x), y2:MT+PH,
+      stroke:'rgba(15,50,96,0.05)', 'stroke-width':0.8 }, axG);
+    mk('line', { x1:f(x), y1:MT+PH, x2:f(x), y2:MT+PH+5,
+      stroke:'#cbd5e1', 'stroke-width':0.8 }, axG);
+    const label = ROUNDS[i].label;
+    const lines = Array.isArray(label) ? label : [label];
+    lines.forEach((line, lineIdx) => {
+      txt(line, {
+        x: f(x), y: MT + PH + 16 + lineIdx * 12,
+        'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '9.5',
+      }, axG);
+    });
+  }
+
+  // ── Build paths ──
+  const computed = top.map(p => ({ ...p, ...buildStepPath(p, cy) }));
+
+  const lineG = mk('g', {}, svg);
+  const dotG  = mk('g', {}, svg);
+  const lblG  = mk('g', {}, svg);
+
+  const allGroups = [];
+  const REST_OP = 1;
+
+  const dimOthers = exceptCode => {
+    for (const pg of allGroups) {
+      const dim = pg.code !== exceptCode;
+      pg.pLineG.setAttribute('opacity', dim ? '0.12' : '1');
+      pg.pDotG .setAttribute('opacity', dim ? '0.12' : '1');
+      pg.pLblG .setAttribute('opacity', dim ? '0.12' : '1');
+    }
+  };
+  const restoreAll = () => {
+    for (const pg of allGroups) {
+      pg.pLineG.setAttribute('opacity', String(REST_OP));
+      pg.pDotG .setAttribute('opacity', '1');
+      pg.pLblG .setAttribute('opacity', '1');
+    }
+  };
+
+  const endLabels = [];
+  const drawLines = [];   // {line} refs for the draw-on animation
+  const fadeGroups = [];  // dot/label groups to fade in
+
+  computed.reverse().forEach((p, code) => {
+    if (!p.pts.length) return;
+    const vpts  = p.pts;
+    const vdots = p.dots;
+    const lastPt = vpts[vpts.length - 1];
+    const vEndX = lastPt[0], vEndCum = lastPt[1];
+    const sw = 2, dotR = 3, haloR = 5;
+
+    const pLineG = mk('g', { opacity: String(REST_OP) }, lineG);
+    const pDotG  = mk('g', {}, dotG);
+    const pLblG  = mk('g', {}, lblG);
+    const pg = { code, pLineG, pDotG, pLblG, playerName: p.name, playerTotal: p.total, labelEl: null };
+    allGroups.push(pg);
+
+    const points = vpts.map(([i, g]) => `${f(cx_round(i))},${f(cy(g))}`).join(' ');
+    const visibleLine = mk('polyline', {
+      points, fill: 'none', stroke: p.color,
+      'stroke-width': sw, 'stroke-linejoin': 'miter', 'stroke-linecap': 'butt',
+    }, pLineG);
+    mk('polyline', {
+      points, fill: 'none', stroke: 'transparent', 'stroke-width': 14,
+      style: 'cursor:pointer',
+    }, pLineG);
+
+    // Per-player scoring dots — enlarged on highlight, revealing the round's
+    // goal count inside the circle.
+    const dotEls = [];   // { halo, main, num }
+    const DOT_BIG = 9, HALO_BIG = 11;
+
+    const setHi = on => {
+      visibleLine.setAttribute('stroke-width', on ? 3.5 : sw);
+      for (const de of dotEls) {
+        de.halo.setAttribute('r', on ? HALO_BIG : haloR);
+        de.main.setAttribute('r', on ? DOT_BIG : dotR);
+        de.num.style.display = on ? '' : 'none';
+      }
+      if (pg.labelEl) {
+        pg.labelEl.textContent = on ? `${pg.playerName}  ${pg.playerTotal} 球` : pg.playerName;
+        pg.labelEl.setAttribute('font-size', on ? '14.5' : String(LBL_FS));
+        pg.labelEl.setAttribute('font-weight', on ? '700' : '400');
+      }
+      pg.pLblG.setAttribute('transform', on ? 'translate(8,0)' : '');
+    };
+    const hiOn  = () => { if (activeHiOff && activeHiOff !== hiOff) activeHiOff(); setHi(true); dimOthers(code); activeHiOff = hiOff; };
+    const hiOff = () => { setHi(false); restoreAll(); if (activeHiOff === hiOff) activeHiOff = null; };
+    pg.hiOn = hiOn; pg.hiOff = hiOff;
+
+    pLineG.lastChild.addEventListener('mouseenter', hiOn);
+    pLineG.lastChild.addEventListener('mouseleave', hiOff);
+
+    drawLines.push(visibleLine);
+    fadeGroups.push(pDotG, pLblG);
+
+    for (const dot of vdots) {
+      const px = f(cx_round(dot.idx)), py = f(cy(dot.cum));
+      const halo = mk('circle', { cx: px, cy: py, r: haloR, fill: '#fff' }, pDotG);
+      const main = mk('circle', { cx: px, cy: py, r: dotR,  fill: p.color }, pDotG);
+      const num  = txt(String(dot.roundGoals), {
+        x: px, y: py, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        fill: '#fff', 'font-size': '11', 'font-weight': '700',
+        style: 'display:none; pointer-events:none;',
+      }, pDotG);
+      dotEls.push({ halo, main, num });
+      const hit = mk('circle', { cx: px, cy: py, r: 13, fill: 'transparent', style: 'cursor:pointer' }, pDotG);
+      hit.addEventListener('mouseenter', e => { hiOn(); ttShow(e, dot, p.name, p.color); });
+      hit.addEventListener('mousemove',  ttMove);
+      hit.addEventListener('mouseleave', () => { hiOff(); ttHide(); });
+      hit.addEventListener('touchstart', e => { e.preventDefault(); hiOn(); ttShow(e, dot, p.name, p.color); }, { passive: false });
+      // No touchend hide — tap-to-inspect persists until another tap or a tap on
+      // empty chart area (see background dismiss); avoids the tooltip flashing.
+    }
+
+    // Name label sits at each line's last point; overlapping labels stack into
+    // rows there (no aligned column, no leader line).
+    endLabels.push({ code, x: cx_round(vEndX) + 8, y: cy(vEndCum) + 4,
+                     flag: p.flag, name: p.name, endCum: vEndCum, color: p.color, rank: p.rank });
+  });
+
+  // Group labels by their shared last point (same end round → same x), then
+  // de-collide ONLY within each group so each group's names stack neatly at that
+  // last point, independent of labels ending at other rounds.
+  const byEnd = new Map();
+  for (const lbl of endLabels) {
+    if (!byEnd.has(lbl.x)) byEnd.set(lbl.x, []);
+    byEnd.get(lbl.x).push(lbl);
+  }
+  for (const group of byEnd.values()) {
+    group.sort((a, b) => a.y - b.y || a.rank - b.rank);
+    for (let i = 1; i < group.length; i++) {
+      if (group[i].y - group[i - 1].y < 16) group[i].y = group[i - 1].y + 16;
+    }
+  }
+  const LBL_FS = 12.5;
+  const halo = {
+    stroke: 'rgba(255,255,255,0.92)', 'stroke-width': '3.5',
+    'stroke-linejoin': 'round', 'paint-order': 'stroke fill',
+  };
+  for (const lbl of endLabels) {
+    const pg = allGroups.find(g => g.code === lbl.code);
+    const flagW = LBL_FS * 1.3, flagH = LBL_FS * 1.3, gap = LBL_FS * 0.35;
+    mk('image', {
+      href: flagHref(lbl.flag), x: f(lbl.x), y: f(lbl.y - flagH * 0.82),
+      width: f(flagW), height: f(flagH),
+    }, pg.pLblG);
+    const nameX = lbl.x + flagW + gap;
+    const nameEl = txt(lbl.name, {
+      ...halo, x: f(nameX), y: f(lbl.y), 'text-anchor': 'start',
+      fill: '#1f2937', 'font-size': String(LBL_FS), 'font-weight': '400',
+    }, pg.pLblG);
+    pg.labelEl = nameEl;
+    pg.pLblG.setAttribute('style', 'cursor:pointer');
+    pg.pLblG.addEventListener('mouseenter', pg.hiOn);
+    pg.pLblG.addEventListener('mouseleave', pg.hiOff);
+    pg.pLblG.addEventListener('touchstart', e => { e.preventDefault(); pg.hiOn(); }, { passive: false });
+  }
+
+  // ── One-time smooth draw-on: lines draw left→right via stroke-dashoffset,
+  // dots + labels fade in as they settle. Guarded so non-browser (and reduced-
+  // motion) environments simply show the finished chart.
+  const reduceMotion = typeof matchMedia === 'function'
+    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (opts.animate && typeof requestAnimationFrame === 'function' && !reduceMotion) {
+    animating = true;
+    const lens = drawLines.map(l => (l.getTotalLength ? l.getTotalLength() : 0));
+    drawLines.forEach((l, i) => {
+      const len = lens[i] || 1;
+      l.style.transition = 'none';
+      l.style.strokeDasharray = len;
+      l.style.strokeDashoffset = len;
+    });
+    fadeGroups.forEach(g => { g.style.transition = 'none'; g.style.opacity = '0'; });
+    svg.getBoundingClientRect();   // force reflow so the initial state applies
+    requestAnimationFrame(() => {
+      drawLines.forEach((l, i) => {
+        l.style.transition = `stroke-dashoffset ${ANIM_DUR}ms ease-out`;
+        l.style.strokeDashoffset = '0';
+      });
+      fadeGroups.forEach(g => {
+        g.style.transition = `opacity 600ms ease-out ${Math.round(ANIM_DUR * 0.55)}ms`;
+        g.style.opacity = '';   // revert to default (dots/labels = 1)
+      });
+    });
+    clearTimeout(animEndTimer);
+    animEndTimer = setTimeout(() => {
+      animating = false;
+      if (pendingRender) { const p = pendingRender; pendingRender = null; drawStatic(p); }
+    }, ANIM_DUR + 700);
+  }
+}
+
+// ── Animation controller (single smooth draw-on) ──
+const ANIM_DUR = 2000;      // draw-on duration (ms)
+let animating = false;
+let animEndTimer = null;
+let pendingRender = null;   // live data waiting for the draw-on to finish
+
+// The line chart and table both show the complete top-10 board in this roundup
+// variant so the label layout matches the published static snapshot.
+const contenders = top => top;
+function drawOn(top)     { render(contenders(top), { animate: true });  renderTable(top); postHeight(); }
+function drawStatic(top) { render(contenders(top), { animate: false }); renderTable(top); postHeight(); }
+
+// ── Data table below the chart (full final standings; not animated) ──
+function renderTable(top) {
+  const tbody = document.getElementById('scorer-tbody');
+  tbody.innerHTML = '';
+  for (const p of top) {
+    const tr = document.createElement('tr');
+    const flagSrc = flagHref(p.flag);
+    tr.innerHTML =
+      `<td class="td-rank">${p.rank}</td>` +
+      `<td class="td-player"><img class="p-flag" src="${flagSrc}" alt="">` +
+        `<span class="p-name">${p.name}</span><span class="p-cc">${p.cc}</span></td>` +
+      `<td class="td-goals">${p.total}</td>` +
+      `<td>${p.assists}</td>` +
+      `<td>${p.minutes ? p.minutes + ' 分鐘' : '—'}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// ── Main ──
+function postHeight() {
+  window.parent.postMessage({ type: 'wc2026-resize', height: document.body.scrollHeight }, '*');
+}
+function updateTimestamp(isoStr) {
+  const el = document.getElementById('update-time');
+  if (!el) return;
+  const d = isoStr ? new Date(isoStr) : new Date();
+  const label = isNaN(d.getTime()) ? isoStr : d.toLocaleString('zh-TW', {
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+  el.textContent = '更新時間：' + label;
+}
+
+async function main() {
+  // Play the smooth draw-on ONCE on load. Prefer any cached data (even stale)
+  // over the hardcoded fallback so the first paint is never blank AND is the
+  // most accurate data we have, mirroring wc2026-bracket.html's renderFromCache().
+  const stale = cacheGetStale('wc26_getScorerBoard');
+  const fallback = rankTop10(FALLBACK);
+  if (stale) {
+    const cached = rankTop10(buildFromBoard(stale.data));
+    drawOn(hasBronzeRoundData(cached) ? cached : fallback);
+    updateTimestamp(stale.updated);
+  } else {
+    drawOn(fallback);
+    updateTimestamp();
+  }
+  try {
+    const result = await fetchAction('getScorerBoard');
+    const live = rankTop10(buildFromBoard(result.data));
+    if (!live.length) return;
+    if (!hasBronzeRoundData(live)) return;
+    // Swap in live data WITHOUT a second animation. If the draw-on is still
+    // running, defer until it finishes so it isn't cut short.
+    if (animating) pendingRender = live;
+    else drawStatic(live);
+    updateTimestamp(result.updated);
+  } catch (e) {
+    // GAS unavailable — keep whatever was already painted (cache or fallback)
+  }
+}
+
+main();
+</script>
+</body>
+</html>
