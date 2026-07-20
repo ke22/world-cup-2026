@@ -177,7 +177,7 @@ body { -webkit-tap-highlight-color: transparent; }
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzy0JSAlS2LRpEM3bZ8xv_qYW4saN8KkKptt91IMdjnpmMWm1ZpeuVG-5Rqie5odRg19Q/exec';
+const SHEET_SCORER_BOARD_CSV_URL = 'https://docs.google.com/spreadsheets/d/1YDuNRBGTx5Jw3kZBYehlYUW4eIFPClDIC91TR_720js/gviz/tq?tqx=out:csv&gid=400750192';
 
 // ── X-axis: the 2026 tournament rounds. The two medal matches share one
 // terminal column so finalist paths are not visually routed through the
@@ -239,62 +239,113 @@ const PLAYER_ALIASES = {
 };
 
 // ── Offline fallback — real top 10 as of the bronze-medal match (goals/assists/
-// minutes from FIFA player statistics). Live getScorerBoard data overrides this
-// on arrival. assists + minutes are exact; per-round goals are a best-effort
-// split that sums to each player's real total (FIFA doesn't publish the
-// per-round breakdown). The chart maps both medal matches into one terminal
-// X-axis column so readers do not infer finalists played the third-place match.
+// minutes from FIFA player statistics). Public scorer_board Sheet CSV overrides
+// this on arrival. The chart maps both medal matches into one terminal X-axis
+// column so readers do not infer finalists played the third-place match.
 // eliminated = team has no matches left (FRA/ENG's tournament ended at bronze;
 // NOR/SEN/MEX/BRA eliminated earlier). ARG/ESP remain active (final TBD).
 const FALLBACK = [
   { name:'姆巴佩',      cc:'FRA', assists:4, minutes:769, eliminated:true,  rounds:{ gs1:2, gs2:2, r32:2, r16:1, r8:1, medal:2 } },
-  { name:'梅西',        cc:'ARG', assists:4, minutes:712, eliminated:false, rounds:{ gs1:3, gs2:1, gs3:1, r32:2, r16:1 } },
+  { name:'梅西',        cc:'ARG', assists:4, minutes:853, eliminated:false, rounds:{ gs1:3, gs2:1, gs3:1, r32:2, r16:1 } },
   { name:'哈蘭德',      cc:'NOR', assists:0, minutes:537, eliminated:true,  rounds:{ gs1:2, gs2:1, gs3:1, r32:1, r16:2 } },
   { name:'凱恩',        cc:'ENG', assists:1, minutes:732, eliminated:true,  rounds:{ gs1:2, gs3:1, r32:2, r16:1 } },
   { name:'狄姆貝利',    cc:'FRA', assists:2, minutes:648, eliminated:true,  rounds:{ gs2:1, gs3:3, r8:1, medal:1 } },
-  { name:'奧亞爾薩巴爾', cc:'ESP', assists:1, minutes:599, eliminated:false, rounds:{ gs2:2, r32:2, r4:1 } },
+  { name:'奧亞爾薩巴爾', cc:'ESP', assists:1, minutes:664, eliminated:false, rounds:{ gs2:2, r32:2, r4:1 } },
   { name:'薩爾',        cc:'SEN', assists:1, minutes:419, eliminated:true,  rounds:{ gs2:2, gs3:1, r32:1 } },
   { name:'基尼奧內斯',  cc:'MEX', assists:1, minutes:440, eliminated:true,  rounds:{ gs1:1, gs2:1, r32:1, r16:1 } },
   { name:'貝林翰',      cc:'ENG', assists:1, minutes:698, eliminated:true,  rounds:{ gs1:1, gs3:1, r16:2, r8:2, medal:1 } },
   { name:'維尼修斯',    cc:'BRA', assists:1, minutes:505, eliminated:true,  rounds:{ gs1:1, gs2:1, gs3:2 } },
 ];
 
-// ── localStorage cache (survives tabs & sessions), mirroring wc2026-bracket.html ──
-const CACHE_TTL = 300; // seconds — GAS cold-start is expensive, cache longer
-function cacheGet(k) {
-  try {
-    const r = localStorage.getItem(k);
-    if (!r) return null;
-    const { ts, data } = JSON.parse(r);
-    return Date.now() - ts < CACHE_TTL * 1000 ? data : null;
-  } catch { return null; }
-}
-function cacheGetStale(k) {
-  // Returns cached data regardless of age (for instant first paint).
-  try {
-    const r = localStorage.getItem(k);
-    if (!r) return null;
-    return JSON.parse(r).data;
-  } catch { return null; }
-}
-function cacheSet(k, d) {
-  try { localStorage.setItem(k, JSON.stringify({ ts: Date.now(), data: d })); } catch {}
-}
-
-async function fetchAction(action) {
-  const key = 'wc26_' + action;
-  const hit = cacheGet(key);
-  if (hit) return hit;
-  const res = await fetch(GAS_URL + '?action=' + action);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.status !== 'ok') throw new Error(json.message || 'API error');
-  const result = { data: json.data, updated: json.updated || null };
-  cacheSet(key, result);
-  return result;
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (ch === '\n') {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else if (ch !== '\r') {
+      cell += ch;
+    }
+  }
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
 }
 
-// ── Map getScorerBoard rows → chart players (goals already bucketed by round) ──
+function csvCell(row, headers, key) {
+  return String(row[headers[key]] ?? '').trim();
+}
+
+function csvNumber(row, headers, key) {
+  const n = Number(csvCell(row, headers, key));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function csvBoolean(row, headers, key) {
+  const s = csvCell(row, headers, key).toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes';
+}
+
+function sheetBoardRowToApi(row, headers) {
+  return {
+    player_code: csvCell(row, headers, 'player_code'),
+    player_name: csvCell(row, headers, 'player_name'),
+    country_code: csvCell(row, headers, 'country_code'),
+    rounds: {
+      gs1: csvNumber(row, headers, '小組賽M1'),
+      gs2: csvNumber(row, headers, '小組賽M2'),
+      gs3: csvNumber(row, headers, '小組賽M3'),
+      r32: csvNumber(row, headers, '32強'),
+      r16: csvNumber(row, headers, '16強'),
+      r8: csvNumber(row, headers, '8強'),
+      r4: csvNumber(row, headers, '4強'),
+      third: csvNumber(row, headers, '季軍賽'),
+      final: csvNumber(row, headers, '決賽'),
+    },
+    assists: csvNumber(row, headers, 'assists'),
+    minutes: csvNumber(row, headers, 'minutes'),
+    eliminated: csvBoolean(row, headers, 'eliminated'),
+    manual: csvBoolean(row, headers, 'manual'),
+  };
+}
+
+async function fetchSheetScorerBoard() {
+  if (!SHEET_SCORER_BOARD_CSV_URL) throw new Error('Sheet CSV URL not configured');
+  const sep = SHEET_SCORER_BOARD_CSV_URL.includes('?') ? '&' : '?';
+  const res = await fetch(`${SHEET_SCORER_BOARD_CSV_URL}${sep}_=${Date.now()}`);
+  if (!res.ok) throw new Error(`Sheet CSV HTTP ${res.status}`);
+  const rows = parseCsv(await res.text()).filter(r => r.some(c => String(c).trim()));
+  const headerRow = rows.shift();
+  if (!headerRow) throw new Error('Sheet CSV is empty');
+  const headers = Object.fromEntries(headerRow.map((h, i) => [String(h).trim(), i]));
+  if (headers.player_code == null || headers.player_name == null || headers.country_code == null) {
+    throw new Error('Sheet CSV missing scorer_board columns');
+  }
+  const data = rows
+    .map(row => sheetBoardRowToApi(row, headers))
+    .filter(row => row.player_code && row.player_name && row.country_code);
+  const manualRows = data.filter(row => row.manual);
+  return manualRows.length ? manualRows : data;
+}
+
+// ── Map scorer_board rows → chart players (goals already bucketed by round) ──
 function aliasKey(value) {
   return String(value || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -739,32 +790,20 @@ function updateTimestamp(isoStr) {
 }
 
 async function main() {
-  // Play the smooth draw-on ONCE on load. Prefer any cached data (even stale)
-  // over the hardcoded fallback so the first paint is never blank AND is the
-  // most accurate data we have, mirroring wc2026-bracket.html's renderFromCache().
-  const stale = cacheGetStale('wc26_getScorerBoard');
   const fallback = rankTop10(FALLBACK);
-  if (stale) {
-    const cached = rankTop10(buildFromBoard(stale.data));
-    drawOn(hasBronzeRoundData(cached) ? cached : fallback);
-    updateTimestamp(stale.updated);
-  } else {
-    drawOn(fallback);
-    updateTimestamp();
-  }
   try {
-    const result = await fetchAction('getScorerBoard');
-    const live = rankTop10(buildFromBoard(result.data));
-    if (!live.length) return;
-    if (!hasBronzeRoundData(live)) return;
-    // Swap in live data WITHOUT a second animation. If the draw-on is still
-    // running, defer until it finishes so it isn't cut short.
-    if (animating) pendingRender = live;
-    else drawStatic(live);
-    updateTimestamp(result.updated);
+    const sheetRows = await fetchSheetScorerBoard();
+    const sheet = rankTop10(buildFromBoard(sheetRows));
+    if (sheet.length && hasBronzeRoundData(sheet)) {
+      drawOn(sheet);
+      updateTimestamp();
+      return;
+    }
   } catch (e) {
-    // GAS unavailable — keep whatever was already painted (cache or fallback)
+    // Public Sheet CSV unavailable — fall through to offline fallback.
   }
+  drawOn(fallback);
+  updateTimestamp();
 }
 
 main();

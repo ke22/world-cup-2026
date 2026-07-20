@@ -469,3 +469,92 @@ while (name.length > 1 && estTextWidth(name, LBL_FS) > availForName) {
 - 當 live/cached API 沒有可用的 medal/季軍資料時，不要讓它覆蓋已同步的 fallback；先保留可正確呈現的靜態 snapshot。
 
 **教訓**：前端「一直沒變」時，第一步不是再改資料邏輯，而是證明瀏覽器載入的是哪一份 HTML。對賽制圖表，X 軸不只是資料欄位，也是敘事語意；同一天發生的冠軍賽／季軍賽應共用終點欄位，而不是畫成會讓讀者誤會的連續流程。
+
+---
+
+## 39. 直讀 Sheet CSV 後，必須保留管理表的資料邊界（`manual=TRUE` 才是發布資料）
+
+**問題**：`wc2026-scorers-rounds-endlabel-v4.html` 已經確認線上 `Response` 是新版，也不再含 `GAS_URL`、`script.google.com`、`getScorerBoard`、`localStorage`，但線上圖表仍出現錯誤排名與英文重複球員：
+
+- `奧亞爾薩巴爾` 與 `Mikel Oyarzabal` 同時出現
+- `狄姆貝利` 與 `Ousmane Dembélé` 同時出現
+- 表格第 8、9 名 minutes 顯示 `—`
+- 看起來像「GAS 還在覆蓋」或「前端一直跑到錯誤資料」
+
+**真正原因**：這次不是 GAS。改成前端直接讀 `scorer_board` CSV 後，前端把整張 Sheet 的所有非空列都拿來排名。`scorer_board` 的資料結構其實有兩層：
+
+- 前 10 列：人工維護、正式發布用，`manual=TRUE`
+- 後面大量列：自動產生或補充資料，`manual=FALSE`
+
+後面的自動列包含英文 player_code / player_name，例如：
+
+```csv
+"oyarzabal","奧亞爾薩巴爾",...,"manual"="TRUE"
+...
+"mikel-oyarzabal","Mikel Oyarzabal",...,"manual"="FALSE"
+"ousmane-dembele","Ousmane Dembélé",...,"manual"="FALSE"
+```
+
+前端 `buildFromBoard()` 雖有部分 alias 去重，但沒有涵蓋所有英文自動列，而且 `rowQuality()` 會偏好 minutes/assists/中文名較完整的列；當英文自動列的 code 不同、又未被 alias 對齊時，它們就被視為新球員並進入 top 10。這不是資料「快取錯」，而是資料邊界被破壞：發布圖表不該吃 `manual=FALSE` 列。
+
+**追查方式**：
+
+1. 先在 Chrome DevTools Network 點開線上 HTML request：
+   `https://www.cna.com.tw/missions/embed/wc2026/wc2026-scorers-rounds-endlabel-v4.html`
+2. 在 `Response` 搜尋：
+   - 應該有：`SHEET_SCORER_BOARD_CSV_URL`
+   - 不應有：`GAS_URL`、`script.google.com`、`getScorerBoard`、`localStorage`
+3. 若 Response 是新版但資料仍錯，就不要再查 GAS；改查 Sheet CSV 實際回傳：
+   ```bash
+   curl -L -s 'https://docs.google.com/spreadsheets/d/1YDuNRBGTx5Jw3kZBYehlYUW4eIFPClDIC91TR_720js/gviz/tq?tqx=out:csv&gid=400750192'
+   ```
+4. 檢查 `manual` 欄，確認錯誤球員是否來自 `manual=FALSE` 的後段自動列。
+
+**解法**：前端 CSV parser 轉 row 時保留 `manual` 欄位，並在 `fetchSheetScorerBoard()` 中若有任何人工列，就只使用 `manual=TRUE` 的資料：
+
+```js
+function sheetBoardRowToApi(row, headers) {
+  return {
+    player_code: csvCell(row, headers, 'player_code'),
+    player_name: csvCell(row, headers, 'player_name'),
+    country_code: csvCell(row, headers, 'country_code'),
+    rounds: { /* round buckets */ },
+    assists: csvNumber(row, headers, 'assists'),
+    minutes: csvNumber(row, headers, 'minutes'),
+    eliminated: csvBoolean(row, headers, 'eliminated'),
+    manual: csvBoolean(row, headers, 'manual'),
+  };
+}
+
+const data = rows
+  .map(row => sheetBoardRowToApi(row, headers))
+  .filter(row => row.player_code && row.player_name && row.country_code);
+const manualRows = data.filter(row => row.manual);
+return manualRows.length ? manualRows : data;
+```
+
+這個 fallback 規則很重要：若未來 Sheet 暫時沒有人工列，頁面仍可用全表資料渲染，不會空白；但在正式管理模式下，只要有 `manual=TRUE`，圖表就以人工發布清單為唯一來源。
+
+**驗證**：
+
+- `node tests/scorer-board.test.js`
+- 用實際 Google Sheet CSV 跑前端轉換模擬，確認只回傳 10 筆 manual row：
+  `manual-only scorer CSV simulation passed`
+- 驗證 top 10 不包含：
+  - `Mikel Oyarzabal`
+  - `Ousmane Dembélé`
+
+**部署檢查**：
+
+- 線上 HTML Response 必須能搜到：
+  ```js
+  const manualRows = data.filter(row => row.manual);
+  return manualRows.length ? manualRows : data;
+  ```
+- 若搜不到，代表 CNA 站上仍是舊 HTML 或 CDN 還沒更新，不是程式邏輯問題。
+- CNA header 可能顯示 `cache-control: max-age=180`、`cache_status: hit`，最多等 3 分鐘，或用 iframe query string cache-bust：
+  ```txt
+  wc2026-scorers-rounds-endlabel-v4.html?v=2026072003
+  ```
+
+**教訓**：從 GAS 改成「前端直讀 Sheet」不是單純換資料 URL。GAS 原本可能隱含了資料清洗、去重、篩選、發布邊界；前端直讀時必須把這些資料契約補回來。對管理型 Sheet，欄位如 `manual`、`published`、`active` 不是輔助欄，而是資料邊界。圖表要吃的是「發布資料」，不是整張工作表。
